@@ -11,8 +11,8 @@ program swe
 
   implicit none
   integer, parameter :: NX=201, NY=201  ! grid dimensions, NxM
-  real, parameter :: dx = 1,  dy = 1 ! grid resolution
-  integer, parameter :: NT=1000 ! number of time steps
+  real, parameter :: dx = 2.0,  dy = 2.0 ! grid resolution
+  integer, parameter :: NT=500 ! number of time steps
   real, parameter :: dt = 0.2   ! time step
   real, parameter :: g = 9.8 ! gravitational constant, Earth surface (m/s)
   real, parameter :: h0 = 1.0 ! mean fluid thickness
@@ -22,24 +22,23 @@ program swe
 
   print *, "shallow wave equations"
 
-  ! initialize h, v
-  h = h0 + h1*gaussian2d(10.0, 0.25*real(NX)*dx/2.0, 0.75*real(NY)*dy/2.0, dx, dy, NX, NY)
+  ! initialize h, v, u
+  h = h0 + h1*gaussian2d(10.0, 0.5*real(NX)*dx, 0.5*real(NY)*dy, dx, dy, NX, NY)
   v = 0.0
   u = 0.0
+  !call set_initial_state()
 
   ! initialize observer
   call observer_init(NX, NY)
 
   ! update h, v
   do i=1,NT
-    u = u - dt*(g*(diff_center_x(h)/dx) + &
-               u*diff_center_x(u)/dx + &
-               v*diff_center_y(u)/dy)
-    v = v - dt*(g*(diff_center_y(h)/dy) + &
-               u*diff_center_x(v)/dx + &
-               v*diff_center_y(v)/dy)
-    h = h - dt*(diff_center_x(u*(h))/dx + &
-               diff_center_y(v*(h))/dy)
+    u = u + dt*du(h,u,v,dx,dy)
+    !u = euler_forward(u, dt, du)
+    v = v + dt*dv(h,u,v,dx,dy)
+    !v = euler_forward(v, dv, dt)
+    h = h + dt*dh(h,u,v,dx,dy)
+    !h = euler_forward(h, dh)
 
     ! write wave to file
     call observer_write(h, i)
