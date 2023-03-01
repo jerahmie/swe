@@ -11,12 +11,12 @@ module equations
   private
 
     real, parameter :: g = -9.8 ! acceleration due to gravity (m/s)
-    real, parameter :: NX = 200, NY = 200  ! grid dimensions
-    real, parameter :: dx = 2.0, dy = 2.0  ! grid resolution
-!    real, dimension(:,:) :: h,u,v
 
-  public :: diff_center_x, diff_center_y, euler_forward, du, dv, dh
+  public :: diff_center_x, diff_center_y, euler_forward, du, dv, dh, set_initial_state
 
+  real, parameter, public :: dx = 2.0, dy = 2.0, dt = 0.2  ! grid resolution
+  integer, parameter, public :: NX = 200, NY = 200, NT = 100  ! grid dimensions
+  
 
   contains
 
@@ -81,7 +81,7 @@ module equations
   !        u -- x-directed velocity 
   !        v -- y-directed velocity
   !        dx -- x grid resolution
-  !        dy -- y greid resolution
+  !        dy -- y grid resolution
   ! Returns: dh
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   pure function dh(h, u, v, dx, dy)
@@ -153,32 +153,51 @@ module equations
   ! Function: euler_forward
   ! Description: Returns forward difference of 2d array
   !              with periodic boundary conditions.
-  ! Input: r -- 2d quantity 
+  ! Input: h -- fluid thickness
+  !        u -- x-directed velocity 
+  !        v -- y-directed velocity
+  !        dx -- x grid resolution
+  !        dy -- y grid resolution
   !        dt -- delta t 
   ! Returns: i
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
-!  subroutine euler_forward(r, dt, df)
-!     
-!     implicit none
-! 
-!     real, dimension(:,:), intent(in) :: r
-!     real, intent(in) :: dt
-!
-!!     interface 
-!!      pure function df(h,u,v,dx,dy)
-!!         real, dimension(:,:), intent(in) :: h, u, v
-!!         real, intent(in) :: dx, dy
-!!         real, dimension(size(h,dim=1),size(h,dim=2))) :: df
-!!      end function df
-!
-!     end interface
-!     real, dimension(size(r,dim=1),size(r,dim=2)) :: h, u, v
-!     real :: dx, dy
-!     ! return value
-!     real, dimension(size(r,dim=1),size(r,dim=2)) :: euler_forward
-!     euler_forward = r + dt*df(h,u,v,dx,dy)
-! 
-!   end function euler_forward
+  !function euler_forward(h, u, v, dx, dy, dt, dh)
+  pure function euler_forward(h, u, v, dx, dy, dt, df)
+     
+    implicit none
+ 
+    real, dimension(:,:), intent(in) :: h, u, v
+    real, intent(in) :: dx, dy, dt
+    ! return value
+    real, dimension(size(h,dim=1),size(h,dim=2)) :: euler_forward
+
+    interface 
+     pure function df(h,u,v,dx,dy)
+        real, dimension(:,:), intent(in) :: h, u, v
+        real, intent(in) :: dx, dy
+        real, dimension(size(h,dim=1),size(h,dim=2)) :: df
+     end function df
+    end interface
+    euler_forward = dt*df(h,u,v,dx,dy)
+  
+  end function euler_forward
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+  ! Name: set_initial_state
+  !
+  !
+  !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+  subroutine set_initial_state(h, u, v)
+    use sources, only: gaussian2d 
+    implicit none
+
+    real, dimension(:,:) :: h, u, v
+  
+    h = 1.0 + 0.1 * gaussian2d(10.0, 0.5*real(NX)*dx, 0.5*real(NY)*dy, dx, dy, NX, NY)  
+    u = 0.0    
+    v = 0.0 
+  end subroutine set_initial_state
 
 end module equations 
 
