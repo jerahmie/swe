@@ -1,4 +1,5 @@
 FC=gfortran
+FCFLAGS='-std=f2003'
 
 SRCS=equations.f90 observer.f90 sources.f90 swe.f90
 OBJS=$(subst .f90,.o,$(SRCS))
@@ -13,16 +14,16 @@ swe: $(OBJS)
 	$(FC) -o $(TARGET) $(OBJS) $(LDFLAGS)
 
 swe.o: swe.f90
-	$(FC) -c swe.f90 -I$(INCLUDE_DIR)
+	$(FC) $(FCFLAGS) -c swe.f90 -I$(INCLUDE_DIR)
 
 equations.o: equations.f90
-	$(FC) -c equations.f90 -I$(INCLUDE_DIR)
+	$(FC) $(FCFLAGS) -c equations.f90 -I$(INCLUDE_DIR)
 
 observer.o: observer.f90
-	$(FC) -c observer.f90 -I$(INCLUDE_DIR)
+	$(FC) $(FCFLAGS) -c observer.f90 -I$(INCLUDE_DIR)
 
 sources.o: sources.f90
-	$(FC) -c sources.f90 -I$(INCLUDE_DIR)
+	$(FC) $(FCFLAGS) -c sources.f90 -I$(INCLUDE_DIR)
 
 
 clean:
