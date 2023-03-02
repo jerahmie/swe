@@ -81,7 +81,6 @@ module observer
     real, dimension(:,:), intent(in) :: h
     integer :: istatus, i
 
-    print *, i
     istatus = nf90_put_var(ncid, hvarid, h, start=(/ 1, 1, i/))
     if (istatus /= 0) then
       print *, "i: ", i

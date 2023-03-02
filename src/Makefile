@@ -4,7 +4,7 @@ SRCS=equations.f90 observer.f90 sources.f90 swe.f90
 OBJS=$(subst .f90,.o,$(SRCS))
 INCLUDE_DIR=/usr/include
 LDFLAGS=-lnetcdff
-LDIBS=/usr/lib/x86_64-linux-gnu
+LDLIBS=/usr/lib/x86_64-linux-gnu
 TARGET=swe
 
 all: swe
