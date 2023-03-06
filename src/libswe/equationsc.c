@@ -10,6 +10,10 @@
 #include "equationsc.h"
 
 /*
+ * Convenience MACROS for index calculation
+ */
+
+/*
  * Function: say_hi
  * Description: Test function that returns int. To be deleted.
  * TODO: delete when finished testing
@@ -25,12 +29,14 @@ int say_hi(void){
  * TODO: delete when finished testing
  */
 int twice_arr(double *arr, int32_t arr_size){
+ 
   int32_t i;
-
+  printf("arr_size: %d\n", arr_size);
   for (i=0; i<arr_size; i++)
   {
     *arr = 2.0* (*arr);
     arr++;
+    
   }
 
   return 0; // no error
@@ -94,8 +100,27 @@ int twice_arr_2d(double **arr, int32_t ni, int32_t nj)
     for (j=0; j<nj; j++)
     {
       arr[i][j] = 2.0 * arr[i][j];
-      //printf("%6.2f", arr[i][j]);
-      //printf("%6.2f", *(*arr));
+    }      
+  }
+  printf("\n");
+  return 0;
+}
+/*
+ * Function: twice_arr_2df
+ * Description: double the values of a 2d array
+ * 
+ */
+int twice_arr_2df(double *arr, int32_t ni, int32_t nj)
+{
+  printf("[twice_arr_2df]\n");
+  int32_t i, j;
+  uintptr_t curr_loc;
+  for (i=0; i<ni; i++)
+  {
+    for (j=0; j<nj; j++)
+    {
+      curr_loc = i*nj + j;
+      *(arr + curr_loc) = 2.0 * *(arr + curr_loc);
     }      
   }
   printf("\n");
@@ -115,11 +140,10 @@ int twice_arr_2d(double **arr, int32_t ni, int32_t nj)
  * Returns: none 
  *
  */
+void diff_center_x(double *r, double *dr, double dx, int32_t nx, int32_t ny ) {
+  int32_t i, j;
 
-//void diff_center_x(double *r, double *dr, double dx, int32_t nx, int32_t ny ) {
-//  int32_t i, j;
-//
-//   /* difference of left-most indices */
+   /* difference of left-most indices */
 //  for (j=0; j<(ny); j++)
 //  {
 //    *(dr*j) = (0.5*dx) * (*(r*(j+1)) - *(r*(j+nx-1)));
@@ -139,4 +163,4 @@ int twice_arr_2d(double **arr, int32_t ni, int32_t nj)
 //      *((dr*j)+i) = (0.5*dx) * (*(r*((j+1)+i)) - *(r*((j-1)+i))); 
 //    }
 //  }
-//}
+}
