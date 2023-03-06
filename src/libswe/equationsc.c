@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include "equationsc.h"
 
-
 /*
  * Function: say_hi
  * Description: Test function that returns int. To be deleted.
@@ -86,17 +85,20 @@ int avg_arr(double *arr, int32_t arr_size){
  * Description: double the values of a 2d array
  * 
  */
-int twice_arr_2d(double *arr, int32_t ni, int32_t nj)
+int twice_arr_2d(double **arr, int32_t ni, int32_t nj)
 {
+  printf("[twice_arr_2d]\n");
   int32_t i, j;
   for (i=0; i<ni; i++)
   {
     for (j=0; j<nj; j++)
     {
-      *arr = 2.0 * (*arr);
-      arr++;
+      arr[i][j] = 2.0 * arr[i][j];
+      //printf("%6.2f", arr[i][j]);
+      //printf("%6.2f", *(*arr));
     }      
   }
+  printf("\n");
   return 0;
 }
 
