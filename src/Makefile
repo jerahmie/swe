@@ -34,6 +34,12 @@ sources.o: sources.f90
 
 libswe/%.o: libswe/%.c
 	$(CC) $(CFLAGS) -c $< -o $@ -I$(INCLUDE_DIR) -Ilibswe
+
+swe_f: test/swe_f.o
+	$(FC) -o test/swe_f test/swe_f.o $(LDFLAGS)
+
+test/swe_f.o: test/swe_f.f90
+	$(FC) $(FCFLAGS) -c test/swe_f.f90 -o test/swe_f.o -I$(INCLUDE_DIR)
 	
 libswe.so: $(COBJS)
 	$(CC) -shared -o libswe.so $(COBJS)

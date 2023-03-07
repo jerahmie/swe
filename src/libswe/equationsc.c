@@ -141,26 +141,29 @@ int twice_arr_2df(double *arr, int32_t ni, int32_t nj)
  *
  */
 void diff_center_x(double *r, double *dr, double dx, int32_t nx, int32_t ny ) {
-  int32_t i, j;
+  int32_t i, j, index;
 
    /* difference of left-most indices */
 //  for (j=0; j<(ny); j++)
 //  {
-//    *(dr*j) = (0.5*dx) * (*(r*(j+1)) - *(r*(j+nx-1)));
 //  }
 //
 //  /* difference of right-most indices */
 //  for (j=0; j<(ny); j++)
 //  {
-//    *(dr*(j+nx-1)) = (0.5*dx) * (*(r*(j+nx-2)) - *(r*j));
 //  }
 //  
-//  /* difference of central region */
-//  for (i=1; i<(nx-1); i++)
-//  {
-//    for (j=0; j<ny; j++)
-//    {
-//      *((dr*j)+i) = (0.5*dx) * (*(r*((j+1)+i)) - *(r*((j-1)+i))); 
-//    }
-//  }
+  /* difference of central region */
+  for (i=1; i<(nx-1); i++)
+  {
+    for (j=0; j<ny; j++)
+    {
+      index = (i+nx)*ny+j;
+      //index_minus = ((i+nx)%nx)*ny+j+1;
+      //indexm = ((i+nx)%nx-1)*ny+j;
+       
+      *(dr+index) = (0.5*dx) * (*(r+index+1) - *(r+index-1)); 
+
+    }
+  }
 }
