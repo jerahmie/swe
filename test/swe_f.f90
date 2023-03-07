@@ -81,9 +81,8 @@ program swe_f
   ! Test diff x
   r = gaussian2d(0.1, 0.5, 0.5, 0.1, 0.1, NXX, NYY) 
   call print_matf(r, NXX, NYY)
-  call diff_center_x(r, drx, dx, NX, NY)
+  call diff_center_x(r, drx, dx, NXX, NYY)
   call print_matf(drx, NXX, NYY)
-
   
  
 
