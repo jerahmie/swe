@@ -1,58 +1,89 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
 ! File: swe_f.f90
-! Test file to call c routines from fortran
+!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 program swe_f
-  use iso_c_binding
+  use, intrinsic :: iso_c_binding, only : c_int, c_double, c_ptr
+  use sources, only: gaussian2d
+
   implicit none
 
   interface
-    function twice_arr_c(arr, n) bind(c, name='twice_arr')
-      use, intrinsic :: iso_c_binding
-      integer(c_int32_t), value :: n
-      real(c_double), dimension(n) :: arr
-    end function twice_arr_c
+    function say_hi() bind(c)
+      import
+      integer(c_int) :: say_hi
+    end function say_hi
 
-    function avg_arr_c(arr, n) bind(c, name='avg_arr')
-      use, intrinsic :: iso_c_binding
-      integer(c_int32_t), value :: n
-      real(c_double), dimension(n) :: arr
-    end function avg_arr_c
+    integer(c_int) function twice_arr(arr, arr_size) bind(c, name="twice_arr")
+      import
+      implicit none
+      integer(c_int), value :: arr_size
+      real(c_double), dimension(arr_size) :: arr
+    end function twice_arr
 
-    function twice_arr_2d_c(arr, ni, nj) bind(c, name='twice_arr_2d')
-      use, intrinsic :: iso_c_binding
-      integer(c_int32_t), value :: ni, nj
-      real(c_double), dimension(ni,nj) :: arr
-      end function twice_arr_2d_c
+    subroutine print_matf(arr, ni, nj ) bind(c, name="print_matf")
+      import
+      integer(c_int), value :: ni
+      integer(c_int), value :: nj
+      real(c_double), dimension(*) :: arr
+    end subroutine print_matf
+
+    integer(c_int) function twice_arr_2d(arr2d, ni, nj) bind(c, name="twice_arr_2df")
+      import 
+      integer(c_int), value :: ni, nj
+      real(c_double), dimension(*) :: arr2d
+    end function twice_arr_2d
+
+    subroutine diff_center_x(r, dr, dx, nx, ny) bind(c, name="diff_center_x")
+      import
+      real(c_double), dimension(*) :: r, dr
+      real(c_double), value :: dx
+      integer(c_int), value :: nx, ny
+    end subroutine
+ 
   end interface
 
   integer :: i, j
-  integer(c_int32_t) :: stat
-  integer, parameter :: arr_len = 10, arr2i = 5, arr2j = 3
-  real(kind=8), dimension(arr_len), target :: arr_fort
-  real(kind=8), dimension(arr2i, arr2j) :: arr2_fort
+  integer :: istat
+  integer(c_int) :: icount
+  integer(c_int), parameter :: NX = 10, NY=5, NXX=10, NYY=10
+  real(c_double), dimension(NX) :: test1
+  real(c_double), dimension(NX,NY) :: arr2d
+  real(c_double), parameter :: dx = 0.1, dy = 0.1
+  real(c_double), dimension(NXX, NYY) :: r, drx
 
-  do i=1,arr_len
-    arr_fort(i) = real(i, kind=8)**2
+  ! If this doesn't work, nothing will
+  istat = say_hi()
+
+  ! Populate and pass a 1D array to C-function 
+  do i = 1, NX
+    test1(i) = real(i, kind=c_double)
   end do
+  
+  !call print_matf(test1, NX, 1) 
+  !istat = twice_arr(test1, NX )
+  !call print_matf(test1, NX, 1)
 
-  print *, "arr_fort: ", arr_fort
-
-  stat = avg_arr_c(arr_fort, arr_len) 
-  print *, "avg_fort: ", arr_fort
-
-!  do i=1,arr2i
-!    do j=1,arr2j
-!      arr2_fort(i,j) = real(i+j, kind=8)
+  ! Populate and pass a 2D array to C-function 
+!  icount = 1
+!  do i=1,NX
+!    do j=1,NY
+!      arr2d(i,j) = real(icount, kind=c_double)
+!      icount = icount + 1
 !    end do
 !  end do
-!      
-!  stat = twice_arr_2d_c(arr2_fort, arr2i, arr2j)
-!  do i=1,arr2i
-!    do j=1,arr2j
-!      print *, real(i+j), arr2_fort(i,j)
-!    end do
-!  end do
-  end program swe_f
+!  call print_matf(arr2d, NX, NY)
+!  istat = twice_arr_2d(arr2d, NX, NY)  
+!  call print_matf(arr2d, NX, NY)
+
+  ! Test diff x
+  r = gaussian2d(0.1, 0.5, 0.5, 0.1, 0.1, NXX, NYY) 
+  call print_matf(r, NXX, NYY)
+  call diff_center_x(r, drx, dx, NXX, NYY)
+  call print_matf(drx, NXX, NYY)
+  
+ 
+
+end program swe_f

@@ -33,11 +33,20 @@ $(OBJS): %.o : %.f90
 $(SWELIB): equationsc.o
 	$(CC) $(CBUILDFLAGS) -o $(SWELIB) equationsc.o
 
-equationsc.o: swelib/equationsc.c
-	$(CC) $(CFLAGS) -c swelib/equationsc.c -I$(INCLUDE_DIR)
+libswe/%.o: libswe/%.c
+	$(CC) $(CFLAGS) -c $< -o $@ -I$(INCLUDE_DIR) -Ilibswe
+
+swe_f: test/swe_f.o
+	$(FC) -o test/swe_f test/swe_f.o $(LDFLAGS)
+
+test/swe_f.o: test/swe_f.f90
+	$(FC) $(FCFLAGS) -c test/swe_f.f90 -o test/swe_f.o -I$(INCLUDE_DIR)
+	
+libswe.so: $(COBJS)
+	$(CC) -shared -o libswe.so $(COBJS)
 
 clean:
-	rm -f *.o $(TARGET) $(SWELIB)
+	rm -f *.o libswe/*.o $(TARGET) libswe.so
 
 distclean: clean
 	rm -r $(TARGET) 
