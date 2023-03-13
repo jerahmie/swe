@@ -18,10 +18,10 @@ SWELIB=libswe.so
 all: $(TARGET) $(SWELIB)
 
 swe: $(OBJS)
-	$(FC) -o $(TARGET) $(OBJS) $(LDFLAGS)
+	$(FC) -o $(TARGET) $(OBJS) $(LDFLAGS) -L$(NETCDF)/lib
 
 $(OBJS): %.o : %.f90
-	$(FC) $(FCFLAGS) -c $< -I$(INCLUDE_DIR)
+	$(FC) $(FCFLAGS) -c $< -I$(INCLUDE_DIR) -I$(NETCDF)/include
 
 $(SWELIB): equationsc.o
 	$(CC) $(CBUILDFLAGS) -o $(SWELIB) equationsc.o
