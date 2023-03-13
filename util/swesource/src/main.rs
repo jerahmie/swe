@@ -3,9 +3,9 @@ use netcdf;
 
 
 fn main(){
-    let nx = 10;
-    let ny = 10;
-    let g2 = gaussian2d(0.2, 0.5, 0.5, 0.1, 0.1, nx, ny);
+    let nx = 101;
+    let ny = 101;
+    let g2 = gaussian2d(0.2, 5., 5., 0.1, 0.1, nx, ny);
 
     // create netcdf file
     let mut file = netcdf::create("gaussian2d.nc").expect("Could not create NetCDF file.");
