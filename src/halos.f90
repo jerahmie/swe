@@ -13,7 +13,7 @@ program swe_mpi
     integer :: rank, size, ierror, tag, status(MPI_STATUS_SIZE)
     integer :: ncid
     character(255) :: cwd, ncfilename
-    character(*), parameter :: ncfile_rel = "/../util/swesource/gaussian2d.nc"
+    character(*), parameter :: ncfile_rel = "/../util/swesource_py/testpy.nc"
     logical :: res
 
     ! check for input file
