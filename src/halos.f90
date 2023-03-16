@@ -32,10 +32,13 @@ program swe_mpi
     ! find nearest neighbors
     cell_neighbors = nearest_neighbors(rank, size) 
 
+    
+
     ! open netcdf file for read
     ierror = nf90mpi_open(mpi_comm=MPI_COMM_WORLD, path=ncfilename, omode=NF_NOWRITE, mpi_info=MPI_INFO_NULL, ncid=ncid)
     if (ierror .ne. 0) print *, "nf90mpi_open error: ", ierror, ". Rank: ", rank
 
+    
     ! close netcdf file
     ierror = nf90mpi_close(ncid)
     if (ierror .ne. 0) print *, "nf90mpi_close: ", ierror, ". Rank: ", rank
