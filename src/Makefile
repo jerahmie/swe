@@ -10,11 +10,11 @@ CHEADERS=$(wildcard libswe/*.h)
 FSRCS=equations.f90 observer.f90 sources.f90 swe.f90
 OBJS=$(subst .f90,.o,$(FSRCS))
 COBJS=$(subst .c,.o,$(CSRCS))
-INCLUDES=-I/usr/include -I${HOME}/local/PnetCDF/include
+INCLUDES=-I/usr/include -I$(NETCDF)/include
 MPI_INCLUDE_DIR=/usr/include/x86_64-linux-gnu/openmpi
-LDFLAGS=-lnetcdff
-LDFLAGS_PARALLEL=-lpnetcdf
-LDLIBS=L/usr/lib/x86_64-linux-gnu
+LDFLAGS=-L$(NETCDF)/lib -lnetcdff
+LDFLAGS_PARALLEL=-L$(PNETCDF)/lib -lpnetcdf
+LDLIBS=-L/usr/lib/x86_64-linux-gnu
 TARGET=swe
 HALOS=halos
 SWELIB=libswe.so
@@ -22,10 +22,10 @@ SWELIB=libswe.so
 all: $(TARGET) $(SWELIB) $(HALOS)
 
 $(HALOS): halos.o
-	$(FC_PARALLEL) -o $(HALOS) halos.o $(LDFLAGS_PARALLEL)
+	$(FC_PARALLEL) -o $(HALOS) halos.o $(LDFLAGS_PARALLEL) -L$(PNETCDF)/lib
 
 halos.o: halos.f90
-	$(FC_PARALLEL) -c halos.f90 $(INCLUDES)
+	$(FC_PARALLEL) -c halos.f90 $(INCLUDES) -I$(PNETCDF)/include
 
 swe: $(OBJS)
 	$(FC) -o $(TARGET) $(OBJS) $(LDFLAGS)

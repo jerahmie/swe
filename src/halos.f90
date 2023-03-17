@@ -12,11 +12,12 @@ program swe_mpi
 
     integer :: rank, comm_size, tag, status(MPI_STATUS_SIZE)
     integer :: ncid, ncstatus
-    integer :: i, j, ndims
+    integer :: i, j, ndims, dimids(2), varid
     integer :: nx, ny, local_nx, local_ny, nsubgrid
     integer, dimension(1024) :: vardimids
     character(255) :: cwd, ncfilename
     character(*), parameter :: ncfile_rel = "/../util/swesource_netcdf3/gaussian2d.nc"
+    character(*), parameter :: ncfile_out = "output.nc"
     character(len=32), dimension(:), allocatable :: varname, dimnamei
     integer(kind=MPI_OFFSET_KIND), dimension(:), allocatable :: dimval
     logical :: res
@@ -46,7 +47,8 @@ program swe_mpi
     cell_neighbors = nearest_neighbors(rank, comm_size) 
 
     ! open netcdf file for read
-    ncstatus = nf90mpi_open(mpi_comm=MPI_COMM_WORLD, path=ncfilename, omode=NF_NOWRITE, mpi_info=MPI_INFO_NULL, ncid=ncid)
+    ncstatus = nf90mpi_open(mpi_comm=MPI_COMM_WORLD, path=ncfilename, omode=NF_NOWRITE, &
+                           mpi_info=MPI_INFO_NULL, ncid=ncid)
     call ncdf_check(ncstatus, "nf90mpi_open", rank)
 
     ! get number, names, and values of dimensions
@@ -88,6 +90,29 @@ program swe_mpi
     ! execute solver
 
     ! write results
+    
+    ! create new netcdf file for read
+    ncstatus = nf90mpi_create(mpi_comm=MPI_COMM_WORLD, path=ncfile_out, cmode=NF_CLOBBER, &
+                           mpi_info=MPI_INFO_NULL, ncid=ncid)
+    call ncdf_check(ncstatus, "nf90mpi_open for write", rank)
+
+    ncstatus = nfmpi_def_dim(ncid, "ny", int(ny, kind=MPI_OFFSET_KIND), dimids(1))
+    call ncdf_check(ncstatus, "nf90mpi_def_dim for write", rank)
+    ncstatus = nfmpi_def_dim(ncid, "nx", int(nx, kind=MPI_OFFSET_KIND), dimids(2))
+    call ncdf_check(ncstatus, "nf90mpi_def_dim for write", rank)
+    
+    ncstatus = nfmpi_def_var(ncid, "var", NF90_FLOAT, 2, dimids, varid)
+    call ncdf_check(ncstatus, "nf90mpi_def_var for write", rank)
+
+    ncstatus = nf90mpi_enddef(ncid)
+    call ncdf_check(ncstatus, "nf90mpi_enddef for write", rank)
+
+    ncstatus = nfmpi_put_vara_real_all(ncid, i, starts, counts, h)
+    call ncdf_check(ncstatus, "nfmpi_put_vara_real_all for write", rank)
+    
+    ! close netcdf file
+    ncstatus = nf90mpi_close(ncid)
+    call ncdf_check(ncstatus, "nf90mpi_close for write", rank)
 
     if (rank .eq. 0) then
         print *, "Program finished with ", comm_size, " threads."
