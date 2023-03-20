@@ -17,12 +17,12 @@ program swe_mpi
     integer, dimension(1024) :: vardimids
     character(255) :: cwd, ncfilename
     character(*), parameter :: ncfile_rel = "/../util/swesource_netcdf3/gaussian2d.nc"
-    character(*), parameter :: ncfile_out = "output.nc"
+    character(255):: ncfile_out = "output.nc"
     character(len=32), dimension(:), allocatable :: varname, dimnamei
     integer(kind=MPI_OFFSET_KIND), dimension(:), allocatable :: dimval
     logical :: res
     real(kind=4), dimension(:,:), allocatable :: h
-    integer(kind=MPI_OFFSET_KIND) :: starts(1,2), counts(1,2)
+    integer(kind=MPI_OFFSET_KIND) :: starts(2), counts(2)
     ! check for input file
     call getcwd(cwd)
     ncfilename=trim(cwd)//ncfile_rel
@@ -67,18 +67,24 @@ program swe_mpi
             ny = dimval(i)
         endif
     end do
-    print *, "nx: ", nx, " ny: ", ny
 
+    
     local_nx = nx/nsubgrid
     local_ny = ny/nsubgrid
+    print *, "rank: ", rank, " nx: ", nx, " ny: ", ny, "local_nx", local_nx, "local_ny", local_ny
+    !if (rank .eq. 0) then
+    !    print *, "nx: ", nx, " ny: ", ny, " nsubgrid: ", nsubgrid
+    !    print *, "local_nx: ", local_nx, " local_ny: ", local_ny
+    !endif
 
     ! read data subregion
-    starts(1,1) = local_nx*(mod(rank, nsubgrid)) + 1
-    starts(1,2) = local_ny*(mod(rank, nsubgrid)) + 1
-    counts(1,1) = local_nx
-    counts(1,2) = local_ny 
-
-    allocate(h(nx, ny)) 
+    starts(1) = local_nx*mod(rank,nsubgrid)+1
+    starts(2) = local_ny*(rank*local_ny/nx) + 1
+    counts(1) = local_nx
+    counts(2) = local_ny
+    print*, "rank: ", rank,  " starts: ", starts, "  counts: ", counts, " local_nx: ", local_nx, "local_ny: ", local_ny
+    allocate(h(local_nx, local_ny))
+    h=real(rank,kind=4)
     i=1 ! h is only variable in source netcdf
     ncstatus = nfmpi_get_vara_real_all(ncid, i , starts, counts, h)
     call ncdf_check(ncstatus, "nfmpi_get_vara_real_all", rank)
@@ -88,17 +94,19 @@ program swe_mpi
     call ncdf_check(ncstatus, "nf90mpi_close", rank)
 
     ! execute solver
+    !if (rank .ne. 3) h=0.
 
+    !h=real(rank,kind=4) + 1.0
     ! write results
     
     ! create new netcdf file for read
-    ncstatus = nf90mpi_create(mpi_comm=MPI_COMM_WORLD, path=ncfile_out, cmode=NF_CLOBBER, &
+    !write(ncfile_out, '(A6,I2,A3)') "output_",rank,".nc"
+    ncstatus = nf90mpi_create(mpi_comm=MPI_COMM_WORLD, path=trim(ncfile_out), cmode=NF_CLOBBER, &
                            mpi_info=MPI_INFO_NULL, ncid=ncid)
     call ncdf_check(ncstatus, "nf90mpi_open for write", rank)
-
-    ncstatus = nfmpi_def_dim(ncid, "ny", int(ny, kind=MPI_OFFSET_KIND), dimids(1))
+    ncstatus = nfmpi_def_dim(ncid, "ny", int(ny, kind=MPI_OFFSET_KIND), dimids(2))
     call ncdf_check(ncstatus, "nf90mpi_def_dim for write", rank)
-    ncstatus = nfmpi_def_dim(ncid, "nx", int(nx, kind=MPI_OFFSET_KIND), dimids(2))
+    ncstatus = nfmpi_def_dim(ncid, "nx", int(nx, kind=MPI_OFFSET_KIND), dimids(1))
     call ncdf_check(ncstatus, "nf90mpi_def_dim for write", rank)
     
     ncstatus = nfmpi_def_var(ncid, "var", NF90_FLOAT, 2, dimids, varid)
@@ -106,7 +114,10 @@ program swe_mpi
 
     ncstatus = nf90mpi_enddef(ncid)
     call ncdf_check(ncstatus, "nf90mpi_enddef for write", rank)
-
+    if (rank .eq. 0) then
+        print*, "dimids: ", dimids, " varid: ", varid
+    endif
+    
     ncstatus = nfmpi_put_vara_real_all(ncid, i, starts, counts, h)
     call ncdf_check(ncstatus, "nfmpi_put_vara_real_all for write", rank)
     

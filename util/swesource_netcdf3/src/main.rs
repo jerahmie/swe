@@ -3,10 +3,10 @@ use netcdf3::{FileWriter, DataSet, Version};
 
 fn main()
 {
-    let nx: usize = 100;
-    let ny: usize = 100;
+    let nx: usize = 10;
+    let ny: usize = 10;
     let filename = "gaussian2d.nc";
-    let g2 = gaussian2d(0.2, 5.0, 5.0, 0.1, 0.1, nx, ny);
+    let g2 = gaussian2d(0.2, 0.5, 0.5, 0.1, 0.1, nx, ny);
 
     //let data_set: DataSet = {
     let mut data_set: DataSet = DataSet::new();
