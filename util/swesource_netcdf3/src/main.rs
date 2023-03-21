@@ -1,12 +1,22 @@
+use std::env;
 use swesource_netcdf3::gaussian2d;
 use netcdf3::{FileWriter, DataSet, Version};
 
 fn main()
 {
-    let nx: usize = 10;
-    let ny: usize = 10;
+    //let nx: usize = 10;
+    //let ny: usize = 10;
     let filename = "gaussian2d.nc";
-    let g2 = gaussian2d(0.2, 0.5, 0.5, 0.1, 0.1, nx, ny);
+    let args: Vec<String> = env::args().collect();
+    let sigma = args[1].parse::<f64>().unwrap();
+    let x0 = args[2].parse::<f64>().unwrap();
+    let y0 = args[3].parse::<f64>().unwrap();
+    let dx = args[4].parse::<f64>().unwrap();
+    let dy = args[5].parse::<f64>().unwrap();
+    let nx = args[6].parse::<usize>().unwrap();
+    let ny = args[7].parse::<usize>().unwrap();
+
+    let g2 = gaussian2d(sigma, x0*(nx as f64)*dx, y0*(ny as f64)*dy, dx, dy, nx, ny);
 
     //let data_set: DataSet = {
     let mut data_set: DataSet = DataSet::new();
