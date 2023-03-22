@@ -1,12 +1,13 @@
 program swe_mpi
     use mpi
     use pnetcdf
+    use init_par
 
     implicit none
 
-    type Neighbors
-        integer :: right, left, below, above
-    end type Neighbors
+!    type Neighbors
+!        integer :: right, left, below, above
+!    end type Neighbors
 
     type(Neighbors) :: cell_neighbors
 
@@ -21,7 +22,7 @@ program swe_mpi
     character(len=32), dimension(:), allocatable :: varname, dimnamei
     integer(kind=MPI_OFFSET_KIND), dimension(:), allocatable :: dimval
     logical :: res
-    real(kind=4), dimension(:,:), allocatable :: h
+    real(kind=4), dimension(:,:), allocatable :: h, dhx
     integer(kind=MPI_OFFSET_KIND) :: starts(2), counts(2)
     ! check for input file
     call getcwd(cwd)
@@ -46,6 +47,7 @@ program swe_mpi
     ! find nearest neighbors
     cell_neighbors = nearest_neighbors(rank, comm_size) 
 
+    ! TODO: move load data calls to module
     ! open netcdf file for read
     ncstatus = nf90mpi_open(mpi_comm=MPI_COMM_WORLD, path=ncfilename, omode=NF_NOWRITE, &
                            mpi_info=MPI_INFO_NULL, ncid=ncid)
@@ -71,20 +73,16 @@ program swe_mpi
     
     local_nx = nx/nsubgrid
     local_ny = ny/nsubgrid
-    print *, "rank: ", rank, " nx: ", nx, " ny: ", ny, "local_nx", local_nx, "local_ny", local_ny
-    !if (rank .eq. 0) then
-    !    print *, "nx: ", nx, " ny: ", ny, " nsubgrid: ", nsubgrid
-    !    print *, "local_nx: ", local_nx, " local_ny: ", local_ny
-    !endif
 
     ! read data subregion
     starts(1) = local_nx*mod(rank,nsubgrid)+1
     starts(2) = local_ny*(rank*local_ny/nx) + 1
     counts(1) = local_nx
     counts(2) = local_ny
-    print*, "rank: ", rank,  " starts: ", starts, "  counts: ", counts, " local_nx: ", local_nx, "local_ny: ", local_ny
-    allocate(h(local_nx, local_ny))
-    h=real(rank,kind=4)
+
+    allocate(h(local_nx+2, local_ny+2))
+    allocate(dhx(local_nx+2, local_ny+2))
+
     i=1 ! h is only variable in source netcdf
     ncstatus = nfmpi_get_vara_real_all(ncid, i , starts, counts, h)
     call ncdf_check(ncstatus, "nfmpi_get_vara_real_all", rank)
@@ -94,13 +92,11 @@ program swe_mpi
     call ncdf_check(ncstatus, "nf90mpi_close", rank)
 
     ! execute solver
-    !if (rank .ne. 3) h=0.
+    call derivative(local_nx, local_ny, h, dhx)
 
-    !h=real(rank,kind=4) + 1.0
     ! write results
-    
+    ! TODO: move to output module 
     ! create new netcdf file for read
-    !write(ncfile_out, '(A6,I2,A3)') "output_",rank,".nc"
     ncstatus = nf90mpi_create(mpi_comm=MPI_COMM_WORLD, path=trim(ncfile_out), cmode=NF_CLOBBER, &
                            mpi_info=MPI_INFO_NULL, ncid=ncid)
     call ncdf_check(ncstatus, "nf90mpi_open for write", rank)
@@ -137,16 +133,16 @@ program swe_mpi
         ! Function: nlen_subgrids
         ! Description: returns number of subgrids on side of in square grids
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        pure function nlen_subgrids(nprocs)
-
-            implicit none
-            
-            integer, intent(in) :: nprocs
-            integer :: nlen_subgrids
-
-            nlen_subgrids = int(sqrt(real(nprocs)))
-
-        end function nlen_subgrids
+!        pure function nlen_subgrids(nprocs)
+!
+!            implicit none
+!            
+!            integer, intent(in) :: nprocs
+!            integer :: nlen_subgrids
+!
+!            nlen_subgrids = int(sqrt(real(nprocs)))
+!
+!        end function nlen_subgrids
 
 
 
@@ -160,25 +156,25 @@ program swe_mpi
         !          to the right, left, above and below 
         !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        pure function nearest_neighbors(i,N)
-            
-            implicit none
-
-            integer, intent(in) :: i, N
-            integer :: ni
-
-            ! return value: nearest neighbors
-            type(Neighbors) :: nearest_neighbors
-
-            ni = int(sqrt(real(N,kind=8)))
-
-            ! note: (i/ni)*ni = integer equivalent of floor(i/ni)*ni
-            nearest_neighbors%right = mod(i+1,ni) + (i/ni)*ni 
-            nearest_neighbors%left = mod(i+ni-1,ni) + (i/ni)*ni
-            nearest_neighbors%below = mod(i+N-ni, N)
-            nearest_neighbors%above = mod(i+N+ni, N)
-
-        end function nearest_neighbors
+!        pure function nearest_neighbors(i,N)
+!            
+!            implicit none
+!
+!            integer, intent(in) :: i, N
+!            integer :: ni
+!
+!            ! return value: nearest neighbors
+!            type(Neighbors) :: nearest_neighbors
+!
+!            ni = int(sqrt(real(N,kind=8)))
+!
+!            ! note: (i/ni)*ni = integer equivalent of floor(i/ni)*ni
+!            nearest_neighbors%right = mod(i+1,ni) + (i/ni)*ni 
+!            nearest_neighbors%left = mod(i+ni-1,ni) + (i/ni)*ni
+!            nearest_neighbors%below = mod(i+N-ni, N)
+!            nearest_neighbors%above = mod(i+N+ni, N)
+!
+!        end function nearest_neighbors
 
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -250,7 +246,8 @@ program swe_mpi
 
             do j = 1, ny
             do i = 1, nx
-               dx(i,j) = x(i+1,j) - x(i-1,j)
+               ! dx(i,j) = x(i+1,j) - x(i-1,j)
+               dx(i,j) = x(i,j)
             end do
             end do
         end subroutine derivative

@@ -7,7 +7,7 @@ CBUILDFLAGS=-shared
 CFLAGS=-Wall -fPIC
 CSRCS=$(wildcard libswe/*.c)
 CHEADERS=$(wildcard libswe/*.h)
-FSRCS=equations.f90 observer.f90 sources.f90 swe.f90
+FSRCS=equations.f90 observer.f90 sources.f90 init_par.f90 swe.f90
 OBJS=$(subst .f90,.o,$(FSRCS))
 COBJS=$(subst .c,.o,$(CSRCS))
 INCLUDES=-I/usr/include -I$(NETCDF)/include
@@ -22,7 +22,7 @@ SWELIB=libswe.so
 all: $(TARGET) $(SWELIB) $(HALOS)
 
 $(HALOS): halos.o
-	$(FC_PARALLEL) -o $(HALOS) halos.o $(LDFLAGS_PARALLEL) -L$(PNETCDF)/lib
+	$(FC_PARALLEL) -o $(HALOS) halos.o init_par.o $(LDFLAGS_PARALLEL) -L$(PNETCDF)/lib
 
 halos.o: halos.f90
 	$(FC_PARALLEL) -c halos.f90 $(INCLUDES) -I$(PNETCDF)/include
