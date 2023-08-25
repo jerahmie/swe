@@ -3,6 +3,14 @@
 A simple model to gain experience with Fortran by creating a solver for the shallow water equation.
 
 ## Building with CMake
+`$ mkdir buildtree && cd buildtree`
+`$ cmake .. && make -j`nproc`
+
+## Running Code
+`$ ./src/swe`
+
+## View Results
+`$ ncview observer.nc`
 
 
 ## Specifying specific compilers
