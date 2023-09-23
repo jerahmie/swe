@@ -7,12 +7,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 list( APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules") 
-#find_package(NetCDF MODULE REQUIRED)
-#file(GLOB_RECURSE sources src/*.f90)
-#add_executable(prog ${sources})
 
-# enable_testing()
-# include_directories(include)
 add_subdirectory(src)
 add_subdirectory(util)
 add_subdirectory(test)

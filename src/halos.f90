@@ -49,8 +49,8 @@ program swe_mpi
 
     ! TODO: move load data calls to module
     ! open netcdf file for read
-    ncstatus = nf90mpi_open(mpi_comm=MPI_COMM_WORLD, path=ncfilename, omode=NF_NOWRITE, &
-                           mpi_info=MPI_INFO_NULL, ncid=ncid)
+    ncstatus = nf90mpi_open(mpi_comm=MPI_COMM_WORLD, path=ncfilename, &
+                            omode=NF_NOWRITE, mpi_info=MPI_INFO_NULL, ncid=ncid)
     call ncdf_check(ncstatus, "nf90mpi_open", rank)
 
     ! get number, names, and values of dimensions
@@ -97,8 +97,8 @@ program swe_mpi
     ! write results
     ! TODO: move to output module 
     ! create new netcdf file for read
-    ncstatus = nf90mpi_create(mpi_comm=MPI_COMM_WORLD, path=trim(ncfile_out), cmode=NF_CLOBBER, &
-                           mpi_info=MPI_INFO_NULL, ncid=ncid)
+    ncstatus = nf90mpi_create(mpi_comm=MPI_COMM_WORLD, path=trim(ncfile_out), &
+                              cmode=NF_CLOBBER, mpi_info=MPI_INFO_NULL, ncid=ncid)
     call ncdf_check(ncstatus, "nf90mpi_open for write", rank)
     ncstatus = nfmpi_def_dim(ncid, "ny", int(ny, kind=MPI_OFFSET_KIND), dimids(2))
     call ncdf_check(ncstatus, "nf90mpi_def_dim for write", rank)
