@@ -18,7 +18,6 @@ fn main()
 
     let g2 = gaussian2d(sigma, x0*(nx as f64)*dx, y0*(ny as f64)*dy, dx, dy, nx, ny);
 
-    //let data_set: DataSet = {
     let mut data_set: DataSet = DataSet::new();
         
     let _res = data_set.add_fixed_dim("nx", nx).expect("Unable add nx to data set.");
@@ -28,6 +27,5 @@ fn main()
     file_writer.set_def(&data_set, Version::Classic, 0).unwrap();
     file_writer.write_var_f32("h", g2.into_raw_vec().as_slice()).unwrap();
     file_writer.close().unwrap();
-
 }
 

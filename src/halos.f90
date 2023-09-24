@@ -2,34 +2,38 @@ program swe_mpi
     use mpi
     use pnetcdf
     use init_par
+    use swe_mpi_help
 
     implicit none
 
-!    type Neighbors
-!        integer :: right, left, below, above
-!    end type Neighbors
-
     type(Neighbors) :: cell_neighbors
-
+    integer :: num_args, err 
     integer :: rank, comm_size, tag, status(MPI_STATUS_SIZE)
     integer :: ncid, ncstatus
     integer :: i, j, ndims, dimids(2), varid
     integer :: nx, ny, local_nx, local_ny, nsubgrid
     integer, dimension(1024) :: vardimids
-    character(255) :: cwd, ncfilename
-    character(*), parameter :: ncfile_rel = "/../util/swesource_netcdf3/gaussian2d.nc"
-    character(255):: ncfile_out = "output.nc"
+    character(255) :: ncfile_input, ncfile_output
     character(len=32), dimension(:), allocatable :: varname, dimnamei
     integer(kind=MPI_OFFSET_KIND), dimension(:), allocatable :: dimval
     logical :: res
     real(kind=4), dimension(:,:), allocatable :: h, dhx
     integer(kind=MPI_OFFSET_KIND) :: starts(2), counts(2)
-    ! check for input file
-    call getcwd(cwd)
-    ncfilename=trim(cwd)//ncfile_rel
-    inquire(file=trim(ncfilename), exist=res)
+  
+    ! get filename from command line
+    num_args = command_argument_count()
+    if ( num_args .ne. 2 ) then
+        call help()    
+        call exit(1)
+    end if
+
+    call get_command_argument(1, ncfile_input)
+    call get_command_argument(2, ncfile_output)
+
+    
+    inquire(file=trim(ncfile_input), exist=res)
     if (.not. res) then
-        print *, "Could not find file: ", trim(ncfilename)
+        print *, "Could not find file: ", trim(ncfile_input)
         call exit(1)
     end if
 
@@ -49,7 +53,7 @@ program swe_mpi
 
     ! TODO: move load data calls to module
     ! open netcdf file for read
-    ncstatus = nf90mpi_open(mpi_comm=MPI_COMM_WORLD, path=ncfilename, &
+    ncstatus = nf90mpi_open(mpi_comm=MPI_COMM_WORLD, path=ncfile_input, &
                             omode=NF_NOWRITE, mpi_info=MPI_INFO_NULL, ncid=ncid)
     call ncdf_check(ncstatus, "nf90mpi_open", rank)
 
@@ -97,7 +101,7 @@ program swe_mpi
     ! write results
     ! TODO: move to output module 
     ! create new netcdf file for read
-    ncstatus = nf90mpi_create(mpi_comm=MPI_COMM_WORLD, path=trim(ncfile_out), &
+    ncstatus = nf90mpi_create(mpi_comm=MPI_COMM_WORLD, path=trim(ncfile_output), &
                               cmode=NF_CLOBBER, mpi_info=MPI_INFO_NULL, ncid=ncid)
     call ncdf_check(ncstatus, "nf90mpi_open for write", rank)
     ncstatus = nfmpi_def_dim(ncid, "ny", int(ny, kind=MPI_OFFSET_KIND), dimids(2))
