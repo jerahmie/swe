@@ -7,14 +7,13 @@ program swe_mpi
     implicit none
 
     type(Neighbors) :: cell_neighbors
-    integer :: num_args, err 
-    integer :: rank, comm_size, tag, status(MPI_STATUS_SIZE)
-    integer :: ncid, ncstatus
+    integer :: num_args
+    integer :: rank, comm_size, ncid, ncstatus
     integer :: i, j, ndims, dimids(2), varid
     integer :: nx, ny, local_nx, local_ny, nsubgrid
-    integer, dimension(1024) :: vardimids
+    !integer, dimension(1024) :: vardimids
     character(255) :: ncfile_input, ncfile_output
-    character(len=32), dimension(:), allocatable :: varname, dimnamei
+    character(len=32), dimension(:), allocatable :: dimnamei ! varname
     integer(kind=MPI_OFFSET_KIND), dimension(:), allocatable :: dimval
     logical :: res
     real(kind=4), dimension(:,:), allocatable :: h, dhx
@@ -30,7 +29,6 @@ program swe_mpi
     call get_command_argument(1, ncfile_input)
     call get_command_argument(2, ncfile_output)
 
-    
     inquire(file=trim(ncfile_input), exist=res)
     if (.not. res) then
         print *, "Could not find file: ", trim(ncfile_input)
@@ -133,53 +131,6 @@ program swe_mpi
     
     contains
 
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! Function: nlen_subgrids
-        ! Description: returns number of subgrids on side of in square grids
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!        pure function nlen_subgrids(nprocs)
-!
-!            implicit none
-!            
-!            integer, intent(in) :: nprocs
-!            integer :: nlen_subgrids
-!
-!            nlen_subgrids = int(sqrt(real(nprocs)))
-!
-!        end function nlen_subgrids
-
-
-
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! Function: nearest_neighbors
-        ! Description: Returns struct with nearest neighbors on a cyclic grid
-        !
-        ! Input:   i -- index of compute cell
-        !          N -- total number of cells in square grid
-        ! Returns: derived-type that contains the index of the cell neighbor
-        !          to the right, left, above and below 
-        !
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!        pure function nearest_neighbors(i,N)
-!            
-!            implicit none
-!
-!            integer, intent(in) :: i, N
-!            integer :: ni
-!
-!            ! return value: nearest neighbors
-!            type(Neighbors) :: nearest_neighbors
-!
-!            ni = int(sqrt(real(N,kind=8)))
-!
-!            ! note: (i/ni)*ni = integer equivalent of floor(i/ni)*ni
-!            nearest_neighbors%right = mod(i+1,ni) + (i/ni)*ni 
-!            nearest_neighbors%left = mod(i+ni-1,ni) + (i/ni)*ni
-!            nearest_neighbors%below = mod(i+N-ni, N)
-!            nearest_neighbors%above = mod(i+N+ni, N)
-!
-!        end function nearest_neighbors
-
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! Function: ncdfcheck
@@ -201,9 +152,11 @@ program swe_mpi
             
             if (ncstatus .ne. 0) then
                 if (present(rank)) then
-                    write (6, *) "PnetCDF procedure reported error: (" , ncstatus, "), rank ", rank, ": ", trim(message)   
+                    write (6, *) "PnetCDF procedure reported error: (" , &
+                        ncstatus, "), rank ", rank, ": ", trim(message)   
                 else
-                    write (6, *) "PnetCDF procedure reported error: (", ncstatus, "): ", trim(message)
+                    write (6, *) "PnetCDF procedure reported error: (", &
+                        ncstatus, "): ", trim(message)
                 end if
             end if
         
@@ -249,10 +202,10 @@ program swe_mpi
             ! call MPI_Isend(..., x(1,:), ...)     ! send to task to left
 
             do j = 1, ny
-            do i = 1, nx
-               ! dx(i,j) = x(i+1,j) - x(i-1,j)
-               dx(i,j) = x(i,j)
-            end do
+                do i = 1, nx
+                   ! dx(i,j) = x(i+1,j) - x(i-1,j)
+                   dx(i,j) = x(i,j)
+                end do
             end do
         end subroutine derivative
 
