@@ -1,6 +1,25 @@
 use libm::exp;
 use ndarray::Array2;
 
+// Function: uniform
+// Returns a uniform source over the nx, ny grid.
+//
+// Inputs: val - value
+//         nx  - X dimension
+//         ny  - Y dimension
+//
+// Returns: Array2 - 2D array of size ny x ny
+//
+pub fn uniform2d(val: f64, nx: usize, ny: usize) -> Array2<f32> {
+    let mut uniform2d = Array2::<f32>::zeros((nx,ny));
+    for((_i,_j),elt) in uniform2d.indexed_iter_mut(){
+        *elt = val as f32;
+    }
+    uniform2d
+}
+
+
+
 // Function: gaussian2d
 // Returns a 2D Gaussian of the form exp(-1*i((x-x0)^2 + (y-y0)^2)/(2*sigma^2))
 //
@@ -30,5 +49,18 @@ mod tests {
     fn gaussian2d_dims() {
         let g2d = gaussian2d(1.0, 0.0, 0.0, 0.1, 0.1, 10, 5);
         assert_eq!(g2d.raw_dim(), [10,5]);
+    }
+
+    #[test]
+    fn uniform2d_vals() {
+        let v1 = 1.0;
+        let nx = 10;
+        let ny = 20;
+        let u2d = uniform2d(v1, 10, 20);
+        for i in 0..nx {
+            for j in 0..ny {
+                assert_eq!(u2d[[i,j]], 1.0);
+            }
+        }
     }
 }

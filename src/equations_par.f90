@@ -1,4 +1,4 @@
-module equations
+module equations_par
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Module equations.f90
 !
@@ -198,5 +198,5 @@ module equations
     v = 0.0 
   end subroutine set_initial_state
 
-end module equations 
+end module equations_par 
 

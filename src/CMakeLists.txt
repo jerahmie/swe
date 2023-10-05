@@ -14,6 +14,8 @@ add_executable(swe
 target_link_libraries(swe NetCDF::NetCDF_Fortran)
 add_executable(swe_mpi
 	       init_par.f90
+		   equations_par.f90
+		   sources.f90
 	       swe_mpi_help.f90
 	       halos.f90)
 message( STATUS "MPI_FOUND: ${MPI_FOUND}, MPI_FORTRAN_FOUND: ${MPI_FORTRAN_FOUND}")

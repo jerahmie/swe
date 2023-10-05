@@ -10,9 +10,19 @@ program swe
   use sources, only : gaussian2d
 
   implicit none
-  real, dimension(NX,NY) :: u, v, h
+  real, allocatable :: u(:,:), v(:,:), h(:,:)
   integer :: i
   character(len=32) :: fmt1
+
+  ! simulation variables
+  NX = 200
+  NY = 200
+  NT = 100
+
+  ! allocate memory for state variables
+  allocate(u(NX,NY))
+  allocate(v(NX,NY))
+  allocate(h(NX,NY))
 
   print *, "shallow wave equations"
   fmt1 =  '(a, "->", i4, "/", i4)'
@@ -38,5 +48,10 @@ program swe
   ! finalize observer
   write (*,*) achar(10)
   call observer_finalize() 
+
+  ! cleanup state variables
+  deallocate(u)
+  deallocate(v)
+  deallocate(h)
 end program swe
 
