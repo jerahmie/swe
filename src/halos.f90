@@ -3,7 +3,7 @@ program swe_mpi
     use pnetcdf
     use init_par
     use swe_mpi_help
-!    use equations_par
+    use equations_par
 
     implicit none
 
@@ -11,7 +11,7 @@ program swe_mpi
     integer :: num_args
     integer :: comm_rank, comm_size, ncid, ncstatus
     integer :: i, j, it,  ndims, dimids(2), varid
-    integer :: NX, NY, NT, local_nx, local_ny, nsubgrid
+    integer :: local_nx, local_ny, nsubgrid
     character(255) :: ncfile_input, ncfile_output
     character(len=32), dimension(:), allocatable :: dimnamei ! varname
     integer(kind=MPI_OFFSET_KIND), dimension(:), allocatable :: dimval
@@ -22,7 +22,7 @@ program swe_mpi
     ! Simulation variables
     NX = 200
     NY = 200
-    NT = 50
+    NT = 1
     !dt = 0.1
 
     ! get filename from command line
@@ -63,7 +63,6 @@ program swe_mpi
     ! get number, names, and values of dimensions
     ncstatus = nfmpi_inq_ndims(ncid, ndims)  ! number of dimensions
     call ncdf_check(ncstatus, "nfmpi_inq_ndims")
-    call exit(0)  
     allocate(dimval(ndims))
     allocate(dimnamei(ndims))
     
@@ -85,11 +84,9 @@ program swe_mpi
     counts(2) = local_ny
 
     allocate(h(0:local_nx+1, 0:local_ny+1))
-    allocate(dhx(local_nx, local_ny))
     allocate(u(0:local_nx+1, 0:local_ny+1))
     allocate(v(0:local_nx+1, 0:local_ny+1))
     h = 0.0
-    dhx = 0.0 
     u = 0.0
     v = 0.0
 
@@ -102,11 +99,9 @@ program swe_mpi
     call ncdf_check(ncstatus, "nf90mpi_close", comm_rank)
 
     ! execute solver
-    !do it=1,NT
-        !call derivative(local_nx, local_ny, u, dux)
-        !call update_h(h,u,v,local_nx,local_ny,dx,dy,dt)
-        !u = u + dt*dux
-    !end do
+    do it=1,NT
+        call update_h(h,u,v,local_nx,local_ny,dx,dy,dt)
+    end do
 
     ! write results
     ! TODO: move to output module 
@@ -128,7 +123,7 @@ program swe_mpi
         print*, "dimids: ", dimids, " varid: ", varid
     endif
     
-    ncstatus = nfmpi_put_vara_real_all(ncid, i, starts, counts, dhx)
+    ncstatus = nfmpi_put_vara_real_all(ncid, i, starts, counts, h(1:local_nx,1:local_ny))
     call ncdf_check(ncstatus, "nfmpi_put_vara_real_all for write", comm_rank)
     
     ! close netcdf file
@@ -140,10 +135,9 @@ program swe_mpi
     end if
     
     call MPI_Finalize(ncstatus)
-    !deallocate(h)
-    !deallocate(dhx)
-    !deallocate(u)
-    !deallocate(v)
+    deallocate(h)
+    deallocate(u)
+    deallocate(v)
     
     contains
 
@@ -178,124 +172,115 @@ program swe_mpi
         end subroutine ncdf_check
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! Function: derivative
+        ! Function: update_h
         ! Description:
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
-!        subroutine derivative(nx, ny, x, dx)
-!            implicit none 
-!
-!            integer, intent(in) :: nx, ny            ! field dims
-!            integer :: PX, pleft, pright
-!            ! Actually, this MPI task only "owns" x(1:nx,1:ny)
-!            real, dimension(0:nx+1,0:ny+1), intent(in) :: x
-!            real, dimension(nx,ny), intent(out) :: dx   ! x-deriv of field
-!            integer  :: stat(MPI_STATUS_SIZE)
-!            integer :: i, j, tag, ierr, rreq
-!            
-!            ! In setup routine
-!            ! *) NPX - num tasks in x-direction (initially, sqrt(comm_size))
-!            ! *) NPY - num tasks in y-direction (initially, sqrt(comm_size))
-!            ! *) PX  - x-coord in decomp = (comm_rank % NPX)
-!            ! *) PY  - y-coord in decomp = (comm_rank / NPY)
-!
-!            PX = nlen_subgrids(comm_size)
-!            pright = mod(comm_rank+1,PX) + (comm_rank/PX)*PX  
-!            pleft = mod(comm_rank+PX-1,PX) + (comm_rank/PX)*PX  
-!            !
-!            ! Do "halo exchange" here to ensure that
-!            ! x(0,:) and x(nx+1,:) are updated from neighboring processors
-!            !
-!            ! 1) Every MPI task needs to know its location in the overall decomposition (PX, PY)
-!            ! 2) For the halo exchange, updated left column from processor PX-1
-!            !                           updated right column from processor PX+1
-!
-!            ! call MPI_Irecv(..., x(0,:), ...)     ! recv from task to left
-!            ! call MPI_Irecv(..., x(nx+1,:), ...)  ! recv from task to right
-!
-!            ! call MPI_Isend(..., x(nx,:), ...)    ! send to task to right
-!            ! call MPI_Isend(..., x(1,:), ...)     ! send to task to left
-!             
-!            call MPI_Irecv(x(0,:), ny+2, MPI_REAL, pleft, pright, &
-!                           MPI_COMM_WORLD, rreq, ierr)
-!            call MPI_Irecv(x(nx+1,:), ny+2, MPI_REAL, pright, pleft, &
-!                           MPI_COMM_WORLD, rreq, ierr)
-!            call MPI_Isend(x(nx,:), ny+2, MPI_REAL, pright, pright, &
-!                           MPI_COMM_WORLD, rreq, ierr)
-!            call MPI_Isend(x(1,:), ny+2, MPI_REAL, pleft, pleft, &
-!                           MPI_COMM_WORLD, rreq, ierr)
-!            call MPI_Wait(rreq, stat, ierr)
-!
-!            !do j = 1, ny
-!            !    do i = 1, nx
-!            !       ! dx(i,j) = x(i+1,j) - x(i-1,j)
-!            !       dx(i,j) = (i,j)
-!            !    end do
-!            !end do
-!        end subroutine derivative
+         subroutine update_h(h,u,v,nx,ny,dx,dy,dt)
+           
+            implicit none 
+            
+             type(Neighbors) :: cell_neighbors
+             integer, intent(in) :: nx, ny          ! field dims
+             real, intent(in) :: dx, dy             ! grid resolution
+             real, intent(in) :: dt                 ! temporal resolution
+             integer :: PX, PY, pleft, pright, pabove, pbelow
+             real, dimension(0:nx+1,0:ny+1), intent(inout) :: h, u, v
+             !real, dimension(0:nx+1,0:ny+1), intent(in) :: u, v 
+             integer  :: stat(MPI_STATUS_SIZE)
+             integer :: i, j, tag, ierr, rreq
+             
+             ! In setup routine
+             ! *) NPX - num tasks in x-direction (initially, sqrt(comm_size))
+             ! *) NPY - num tasks in y-direction (initially, sqrt(comm_size))
+             ! *) PX  - x-coord in decomp = (comm_rank % NPX)
+             ! *) PY  - y-coord in decomp = (comm_rank / NPY)
+ 
+             PX = nlen_subgrids(comm_size)
+             PY = PX ! square MPI grid
+             
+            cell_neighbors = nearest_neighbors(comm_rank, comm_size) 
+             
+            pright = cell_neighbors%right
+            pleft = cell_neighbors%left
+            pbelow = cell_neighbors%below
+            pabove = cell_neighbors%above
+            !print *, comm_rank, "right: ", cell_neighbors%right, "pleft: ", cell_neighbors%left, &
+            !                     "pbelow: ", cell_neighbors%below, "pabove: ", cell_neighbors%above
+            !
+            ! Do "halo exchange" here to ensure that
+            ! x(0,:) and x(nx+1,:) are updated from neighboring processors
+            !
+            ! 1) Every MPI task needs to know its location in the overall decomposition (PX, PY)
+            ! 2) For the halo exchange, updated left column from processor PX-1
+            !                           updated right column from processor PX+1
 
-    
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! Function: derivative
-        ! Description:
-        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    
-!        subroutine update_h(h,u,v,nx,ny,dx,dy,dt)
-!            implicit none 
-!            integer, intent(in) :: nx, ny          ! field dims
-!            real, intent(in) :: dx, dy             ! grid resolution
-!            real, intent(in) :: dt                 ! temporal resolution
-!            integer :: PX, PY, pleft, pright, pabove, pbelow
-!            real, dimension(0:nx+1,0:ny+1), intent(inout) :: h
-!            real, dimension(0:nx+1,0:ny+1), intent(in) :: u, v 
-!            !real, dimension(nx,ny), intent(out) :: dx   ! x-deriv of field
-!            integer  :: stat(MPI_STATUS_SIZE)
-!            integer :: i, j, tag, ierr, rreq
-!            
-!            ! In setup routine
-!            ! *) NPX - num tasks in x-direction (initially, sqrt(comm_size))
-!            ! *) NPY - num tasks in y-direction (initially, sqrt(comm_size))
-!            ! *) PX  - x-coord in decomp = (comm_rank % NPX)
-!            ! *) PY  - y-coord in decomp = (comm_rank / NPY)
-!
-!            PX = nlen_subgrids(comm_size)
-!            PY = PX ! square MPI grid
-!            pright = mod(comm_rank+1,PX) + (comm_rank/PX)*PX  
-!            pleft = mod(comm_rank+PX-1,PX) + (comm_rank/PX)*PX  
-!            pbelow = mod(comm_rank/PY-1,PY)
-!            pabove = mod(comm_rank/Py+1,PY)
-!            print *, comm_rank, "right: ", pright, "pleft: ", pleft, "pbelow: ", pbelow, "pabove: ", pabove
-!            !
-!            ! Do "halo exchange" here to ensure that
-!            ! x(0,:) and x(nx+1,:) are updated from neighboring processors
-!            !
-!            ! 1) Every MPI task needs to know its location in the overall decomposition (PX, PY)
-!            ! 2) For the halo exchange, updated left column from processor PX-1
-!            !                           updated right column from processor PX+1
-!
-!            ! call MPI_Irecv(..., x(0,:), ...)     ! recv from task to left
-!            ! call MPI_Irecv(..., x(nx+1,:), ...)  ! recv from task to right
-!
-!            ! call MPI_Isend(..., x(nx,:), ...)    ! send to task to right
-!            ! call MPI_Isend(..., x(1,:), ...)     ! send to task to left
-!             
-!            call MPI_Irecv(h(0,:), ny+2, MPI_REAL, pleft, pright, &
-!                           MPI_COMM_WORLD, rreq, ierr)
-!            call MPI_Irecv(h(nx+1,:), ny+2, MPI_REAL, pright, pleft, &
-!                           MPI_COMM_WORLD, rreq, ierr)
-!            call MPI_Isend(h(nx,:), ny+2, MPI_REAL, pright, pright, &
-!                           MPI_COMM_WORLD, rreq, ierr)
-!            call MPI_Isend(h(1,:), ny+2, MPI_REAL, pleft, pleft, &
-!                           MPI_COMM_WORLD, rreq, ierr)
-!            call MPI_Wait(rreq, stat, ierr)
-!
-!            !do j = 1, ny
-!            !    do i = 1, nx
-!            !       ! dx(i,j) = x(i+1,j) - x(i-1,j)
-!            !       dx(i,j) = (i,j)
-!            !    end do
-!            !end do
-!        end subroutine update_h
+            ! call MPI_Irecv(..., x(0,:), ...)     ! recv from task to left
+            ! call MPI_Irecv(..., x(nx+1,:), ...)  ! recv from task to right
+ 
+            ! call MPI_Isend(..., x(nx,:), ...)    ! send to task to right
+            ! call MPI_Isend(..., x(1,:), ...)     ! send to task to left
+            ! Halo cells u  
+            call MPI_Irecv(u(0,:), ny+2, MPI_REAL, pleft, pright, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Irecv(u(nx+1,:), ny+2, MPI_REAL, pright, pleft, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Irecv(u(:,0), nx+2, MPI_REAL, pbelow, pabove, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Irecv(u(:,ny+1), nx+2, MPI_REAL, pabove, pbelow, &
+                           MPI_COMM_WORLD, rreq, ierr)
+
+            call MPI_Isend(u(nx,:), ny+2, MPI_REAL, pright, pright, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Isend(u(1,:), ny+2, MPI_REAL, pleft, pleft, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Isend(u(:,ny), nx+2, MPI_REAL, pabove, pabove, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Isend(u(:,1), nx+2, MPI_REAL, pbelow, pbelow, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            ! Halo cells v
+            call MPI_Irecv(v(0,:), ny+2, MPI_REAL, pleft, pright, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Irecv(v(nx+1,:), ny+2, MPI_REAL, pright, pleft, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Irecv(v(:,0), nx+2, MPI_REAL, pbelow, pabove, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Irecv(v(:,ny+1), nx+2, MPI_REAL, pabove, pbelow, &
+                           MPI_COMM_WORLD, rreq, ierr)
+
+            call MPI_Isend(v(nx,:), ny+2, MPI_REAL, pright, pright, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Isend(v(1,:), ny+2, MPI_REAL, pleft, pleft, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Isend(v(:,ny), nx+2, MPI_REAL, pabove, pabove, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Isend(v(:,1), nx+2, MPI_REAL, pbelow, pbelow, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            ! Halo cells h
+            call MPI_Irecv(h(0,:), ny+2, MPI_REAL, pleft, pright, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Irecv(h(nx+1,:), ny+2, MPI_REAL, pright, pleft, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Irecv(h(:,0), nx+2, MPI_REAL, pbelow, pabove, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Irecv(h(:,ny+1), nx+2, MPI_REAL, pabove, pbelow, &
+                           MPI_COMM_WORLD, rreq, ierr)
+
+            call MPI_Isend(h(nx,:), ny+2, MPI_REAL, pright, pright, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Isend(h(1,:), ny+2, MPI_REAL, pleft, pleft, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Isend(h(:,ny), nx+2, MPI_REAL, pabove, pabove, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Isend(h(:,1), nx+2, MPI_REAL, pbelow, pbelow, &
+                           MPI_COMM_WORLD, rreq, ierr)
+            call MPI_Wait(rreq, stat, ierr)
+            
+            u = u + euler_forward(h,u,v,dx,dy,dt,du)
+            v = v + euler_forward(h,u,v,dx,dy,dt,dv)
+            h = h + euler_forward(h,u,v,dx,dy,dt,dh)
+
+        end subroutine update_h
    
 end program
 
