@@ -100,7 +100,7 @@ program swe_mpi
 
     ! execute solver
     do it=1,NT
-        call update_h(h,u,v,local_nx,local_ny,dx,dy,dt)
+        call derivative(local_nx, local_ny, dx, dy, h, u)
     end do
 
     ! write results
@@ -123,7 +123,7 @@ program swe_mpi
         print*, "dimids: ", dimids, " varid: ", varid
     endif
     
-    ncstatus = nfmpi_put_vara_real_all(ncid, i, starts, counts, h(1:local_nx,1:local_ny))
+    ncstatus = nfmpi_put_vara_real_all(ncid, i, starts, counts, u(1:local_nx,1:local_ny))
     call ncdf_check(ncstatus, "nfmpi_put_vara_real_all for write", comm_rank)
     
     ! close netcdf file
@@ -142,6 +142,35 @@ program swe_mpi
     contains
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! Function: mpi_check
+        ! Description:
+        !
+        ! Input: ierr - MPI error code
+        !        message - user informational message
+        !        comm_rank (optional) - mpi processor rank 
+        !
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        subroutine check_mpi_status(ierr, message, comm_rank)
+
+            implicit none
+
+            integer :: ierr
+            integer, optional :: comm_rank
+            character(*) :: message
+
+            if (ierr.ne. 0) then
+                if (present(comm_rank)) then
+                    write (6, *) "MPI procedure reported error: (" , &
+                        ierr, "), comm_rank ", comm_rank, ": ", trim(message)   
+                else
+                    write (6, *) "MPI procedure reported error: (", &
+                        ierr, "): ", trim(message)
+                end if
+            end if
+
+        end subroutine ! check_mpi_status
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! Function: ncdfcheck
         ! Description:
         !
@@ -149,8 +178,6 @@ program swe_mpi
         !        message - user informational message
         !        comm_rank (optional) - mpi processor rank 
         !         
-        ! Returns: Exits program if ncstatus is not zero
-        !
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         subroutine ncdf_check(ncstatus, message, comm_rank)
        
@@ -172,24 +199,26 @@ program swe_mpi
         end subroutine ncdf_check
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! Function: update_h
+        ! Function: derivative
         ! Description:
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
-         subroutine update_h(h,u,v,nx,ny,dx,dy,dt)
+         subroutine derivative(nx, ny, dx, dy, f, df)
            
             implicit none 
             
              type(Neighbors) :: cell_neighbors
              integer, intent(in) :: nx, ny          ! field dims
-             real, intent(in) :: dx, dy             ! grid resolution
-             real, intent(in) :: dt                 ! temporal resolution
              integer :: PX, PY, pleft, pright, pabove, pbelow
-             real, dimension(0:nx+1,0:ny+1), intent(inout) :: h, u, v
-             !real, dimension(0:nx+1,0:ny+1), intent(in) :: u, v 
-             integer  :: stat(MPI_STATUS_SIZE)
-             integer :: i, j, tag, ierr, rreq
-             
+             real, intent(in) :: dx, dy
+             real, dimension(0:nx+1,0:ny+1), intent(inout) :: f
+             real, dimension(0:nx+1,0:ny+1), intent(out) :: df
+             integer  :: stat(8*MPI_STATUS_SIZE)
+             integer :: i, j, tag, ierr
+             integer :: rreq(8)
+             real, dimension(nx) :: data_buf_left, data_buf_right
+             real, dimension(ny) :: data_buf_upper, data_buf_lower
+
              ! In setup routine
              ! *) NPX - num tasks in x-direction (initially, sqrt(comm_size))
              ! *) NPY - num tasks in y-direction (initially, sqrt(comm_size))
@@ -207,7 +236,7 @@ program swe_mpi
             pabove = cell_neighbors%above
             !print *, comm_rank, "right: ", cell_neighbors%right, "pleft: ", cell_neighbors%left, &
             !                     "pbelow: ", cell_neighbors%below, "pabove: ", cell_neighbors%above
-            !
+
             ! Do "halo exchange" here to ensure that
             ! x(0,:) and x(nx+1,:) are updated from neighboring processors
             !
@@ -220,67 +249,55 @@ program swe_mpi
  
             ! call MPI_Isend(..., x(nx,:), ...)    ! send to task to right
             ! call MPI_Isend(..., x(1,:), ...)     ! send to task to left
-            ! Halo cells u  
-            call MPI_Irecv(u(0,:), ny+2, MPI_REAL, pleft, pright, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Irecv(u(nx+1,:), ny+2, MPI_REAL, pright, pleft, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Irecv(u(:,0), nx+2, MPI_REAL, pbelow, pabove, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Irecv(u(:,ny+1), nx+2, MPI_REAL, pabove, pbelow, &
-                           MPI_COMM_WORLD, rreq, ierr)
 
-            call MPI_Isend(u(nx,:), ny+2, MPI_REAL, pright, pright, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Isend(u(1,:), ny+2, MPI_REAL, pleft, pleft, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Isend(u(:,ny), nx+2, MPI_REAL, pabove, pabove, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Isend(u(:,1), nx+2, MPI_REAL, pbelow, pbelow, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            ! Halo cells v
-            call MPI_Irecv(v(0,:), ny+2, MPI_REAL, pleft, pright, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Irecv(v(nx+1,:), ny+2, MPI_REAL, pright, pleft, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Irecv(v(:,0), nx+2, MPI_REAL, pbelow, pabove, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Irecv(v(:,ny+1), nx+2, MPI_REAL, pabove, pbelow, &
-                           MPI_COMM_WORLD, rreq, ierr)
+            ! halo update from left cell
+            call MPI_Irecv(data_buf_left, ny, MPI_REAL, pleft, 0, &
+                           MPI_COMM_WORLD, rreq(1), ierr)
+            call check_mpi_status(ierr, "MPI_Irecv, left", comm_rank)
 
-            call MPI_Isend(v(nx,:), ny+2, MPI_REAL, pright, pright, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Isend(v(1,:), ny+2, MPI_REAL, pleft, pleft, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Isend(v(:,ny), nx+2, MPI_REAL, pabove, pabove, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Isend(v(:,1), nx+2, MPI_REAL, pbelow, pbelow, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            ! Halo cells h
-            call MPI_Irecv(h(0,:), ny+2, MPI_REAL, pleft, pright, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Irecv(h(nx+1,:), ny+2, MPI_REAL, pright, pleft, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Irecv(h(:,0), nx+2, MPI_REAL, pbelow, pabove, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Irecv(h(:,ny+1), nx+2, MPI_REAL, pabove, pbelow, &
-                           MPI_COMM_WORLD, rreq, ierr)
+            ! halo update from right cell
+            call MPI_Irecv(data_buf_right, ny, MPI_REAL, pright, 1, &
+                           MPI_COMM_WORLD, rreq(2), ierr)
+            call check_mpi_status(ierr, "MPI_Irecv, right", comm_rank)
 
-            call MPI_Isend(h(nx,:), ny+2, MPI_REAL, pright, pright, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Isend(h(1,:), ny+2, MPI_REAL, pleft, pleft, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Isend(h(:,ny), nx+2, MPI_REAL, pabove, pabove, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Isend(h(:,1), nx+2, MPI_REAL, pbelow, pbelow, &
-                           MPI_COMM_WORLD, rreq, ierr)
-            call MPI_Wait(rreq, stat, ierr)
+            ! halo update from above cell
+            call MPI_Irecv(data_buf_upper, ny, MPI_REAL, pabove, 2, &
+                           MPI_COMM_WORLD, rreq(3), ierr)
+            call check_mpi_status(ierr, "MPI_Irecv, right", comm_rank)
+
+            ! halo update from below cell
+            call MPI_Irecv(data_buf_lower, ny, MPI_REAL, pbelow, 3, &
+                           MPI_COMM_WORLD, rreq(4), ierr)
+            call check_mpi_status(ierr, "MPI_Irecv, right", comm_rank)
+
+            call MPI_Isend(f(nx,1:ny), ny, MPI_REAL, pright, 0, &
+                           MPI_COMM_WORLD, rreq(5), ierr)
+            call check_mpi_status(ierr, "MPI_Send, right", comm_rank)
+            call MPI_Isend(f(1,1:ny), ny, MPI_REAL, pleft, 1, &
+                           MPI_COMM_WORLD, rreq(6), ierr)
+            call check_mpi_status(ierr, "MPI_Send, left", comm_rank)
+            call MPI_Isend(f(1:nx,1), nx, MPI_REAL, pbelow, 2, &
+                           MPI_COMM_WORLD, rreq(7), ierr)
+            call check_mpi_status(ierr, "MPI_Send, right", comm_rank)
+            call MPI_Isend(f(1:nx,ny), nx, MPI_REAL, pabove, 3, &
+                           MPI_COMM_WORLD, rreq(8), ierr)
+            call check_mpi_status(ierr, "MPI_Send, left", comm_rank)
+           
+            !call MPI_Wait(rreq, MPI_STATUS_IGNORE, ierr)
+            call MPI_Waitall(8, rreq, MPI_STATUSES_IGNORE, ierr)
+            call check_mpi_status(ierr, "MPI_Waitall", comm_rank)
+
+            ! update halos from buffers
+            f(0,1:ny) = data_buf_left
+            f(nx+1,1:ny) = data_buf_right
             
-            u = u + euler_forward(h,u,v,dx,dy,dt,du)
-            v = v + euler_forward(h,u,v,dx,dy,dt,dv)
-            h = h + euler_forward(h,u,v,dx,dy,dt,dh)
+            f(1:nx,0) = data_buf_lower
+            f(1:nx,ny+1) = data_buf_upper
 
-        end subroutine update_h
+            !df = diff_center_x(f,dx)
+            df = diff_center_y(f,dy)
+
+        end subroutine derivative
    
 end program
 

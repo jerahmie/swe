@@ -106,18 +106,20 @@ module equations_par
 
     implicit none
   
-    real, dimension(:,:), intent(in) :: r
+    real, dimension(0:,0:), intent(in) :: r
     real, intent(in) :: dx
-    integer :: xdim
+    integer :: i, j, nxdim, nydim
+    real, dimension(0:size(r,dim=1)-1,0:size(r,dim=2)-1) :: diff_center_x
 
     ! return value
-    real, dimension(size(r,dim=1),size(r,dim=2)) :: diff_center_x
-  
-    xdim = size(r,dim=1)
-    diff_center_x(1,:) = (0.5*dx) * (r(2,:) - r(xdim,:))
-    diff_center_x(xdim,:) = (0.5*dx) * (r(1,:) - r(xdim-1,:))
-    diff_center_x(2:xdim-1,:) = (0.5*dx) * (r(3:xdim,:) - r(1:xdim-2,:))
-    
+    nxdim = size(r,dim=1)-2
+    nydim = size(r,dim=2)-2
+    do j = 1,nydim
+      do i = 1,nxdim
+        diff_center_x(i,j) = (0.5*dx) * (r(i+1,j) - r(i-1,j))
+      end do
+    end do
+
   end function diff_center_x
 
 
@@ -133,18 +135,22 @@ module equations_par
 
     implicit none
   
-    real, dimension(:,:), intent(in) :: r
+    real, dimension(0:,0:), intent(in) :: r
     real, intent(in) :: dy
-    integer :: ydim
+    integer :: i, j, nxdim, nydim
 
     ! return value
-    real, dimension(size(r,dim=1),size(r,dim=2)) :: diff_center_y
+    real, dimension(0:size(r,dim=1)-1,0:size(r,dim=2)-1) :: diff_center_y
   
-    ydim = size(r, dim=2) 
-    diff_center_y(:,1) = (0.5*dy) * (r(:,2) - r(:,ydim))
-    diff_center_y(:,ydim) = (0.5*dy) * (r(:,1) - r(:,ydim-1))
-    diff_center_y(:,2:ydim-1) = (0.5*dy) * (r(:,3:ydim) - r(:,1:ydim-2))
-    
+    ! return value
+    nxdim = size(r,dim=1)-2
+    nydim = size(r,dim=2)-2
+    do j = 1,nydim
+      do i = 1,nxdim
+        diff_center_y(i,j) = (0.5*dy) * (r(i,j+1) - r(i,j-1))
+      end do
+    end do
+  
   end function diff_center_y
 
 
