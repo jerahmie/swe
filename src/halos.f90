@@ -10,7 +10,7 @@ program swe_mpi
     type(Neighbors) :: cell_neighbors
     integer :: num_args
     integer :: comm_rank, comm_size, ncid, ncstatus
-    integer :: i, j, it,  ndims, dimids(2), varid
+    integer :: i, j, it,  ndims, dimids(2), varid, nxid, nyid, timedimid
     integer :: local_nx, local_ny, nsubgrid
     character(255) :: ncfile_input, ncfile_output
     character(len=32), dimension(:), allocatable :: dimnamei ! varname
@@ -98,12 +98,6 @@ program swe_mpi
     ncstatus = nf90mpi_close(ncid)
     call ncdf_check(ncstatus, "nf90mpi_close", comm_rank)
 
-    ! execute solver
-    do it=1,NT
-        u = u + dt*derivative(h, u, v, dx, dy, du)
-        v = v + dt*derivative(h, u, v, dx, dy, dv)
-        h = h + dt*derivative(h, u, v, dx, dy, dh)
-    end do
 
     ! write results
     ! TODO: move to output module 
@@ -111,22 +105,30 @@ program swe_mpi
     ncstatus = nf90mpi_create(mpi_comm=MPI_COMM_WORLD, path=trim(ncfile_output), &
                               cmode=NF_CLOBBER, mpi_info=MPI_INFO_NULL, ncid=ncid)
     call ncdf_check(ncstatus, "nf90mpi_open for write", comm_rank)
-    ncstatus = nfmpi_def_dim(ncid, "ny", int(ny, kind=MPI_OFFSET_KIND), dimids(2))
+    ncstatus = nfmpi_def_dim(ncid, "ny", int(ny, kind=MPI_OFFSET_KIND), nyid)
     call ncdf_check(ncstatus, "nf90mpi_def_dim for write", comm_rank)
-    ncstatus = nfmpi_def_dim(ncid, "nx", int(nx, kind=MPI_OFFSET_KIND), dimids(1))
+    ncstatus = nfmpi_def_dim(ncid, "nx", int(nx, kind=MPI_OFFSET_KIND), nxid)
+    call ncdf_check(ncstatus, "nf90mpi_def_dim for write", comm_rank)
+    ncstatus = nfmpi_def_dim(ncid, "time", nf90mpi_unlimited, timedimid)
     call ncdf_check(ncstatus, "nf90mpi_def_dim for write", comm_rank)
     
-    ncstatus = nfmpi_def_var(ncid, "var", NF90_FLOAT, 2, dimids, varid)
+    ncstatus = nfmpi_def_var(ncid, "var", NF90_FLOAT, 2, (/nxid, nyid, timedimid/), varid)
     call ncdf_check(ncstatus, "nf90mpi_def_var for write", comm_rank)
 
     ncstatus = nf90mpi_enddef(ncid)
     call ncdf_check(ncstatus, "nf90mpi_enddef for write", comm_rank)
     if (comm_rank .eq. 0) then
-        print*, "dimids: ", dimids, " varid: ", varid
+        print*, "dimids: ", nxid, nyid, " varid: ", varid
     endif
     
-    ncstatus = nfmpi_put_vara_real_all(ncid, i, starts, counts, h(1:local_nx,1:local_ny))
-    call ncdf_check(ncstatus, "nfmpi_put_vara_real_all for write", comm_rank)
+    ! execute solver
+    do it=1,NT
+        u = u + dt*derivative(h, u, v, dx, dy, du)
+        v = v + dt*derivative(h, u, v, dx, dy, dv)
+        h = h + dt*derivative(h, u, v, dx, dy, dh)
+        ncstatus = nfmpi_put_vara_real_all(ncid, i, starts, counts, h(1:local_nx,1:local_ny))
+        call ncdf_check(ncstatus, "nfmpi_put_vara_real_all for write", comm_rank)
+    end do
     
     ! close netcdf file
     ncstatus = nf90mpi_close(ncid)
