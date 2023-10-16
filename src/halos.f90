@@ -14,9 +14,9 @@ program swe_mpi
     integer :: local_nx, local_ny, nsubgrid
     character(255) :: ncfile_input, ncfile_output
     character(len=32), dimension(:), allocatable :: dimnamei ! varname
-    integer(kind=MPI_OFFSET_KIND), dimension(:), allocatable :: dimval
+    integer(kind=MPI_OFFSET_KIND),dimension(:), allocatable :: dimval
     logical :: res
-    real(kind=4), allocatable, dimension(:,:) :: h, dhx, u, v
+    real(kind=4), allocatable, dimension(:,:) :: h, u, v
     integer(kind=MPI_OFFSET_KIND) :: starts(2), counts(2)
  
     ! Simulation variables
@@ -100,7 +100,9 @@ program swe_mpi
 
     ! execute solver
     do it=1,NT
-        call derivative(local_nx, local_ny, dx, dy, h, u)
+        u = u + dt*derivative(h, u, v, dx, dy, du)
+        v = v + dt*derivative(h, u, v, dx, dy, dv)
+        h = h + dt*derivative(h, u, v, dx, dy, dh)
     end do
 
     ! write results
@@ -123,7 +125,7 @@ program swe_mpi
         print*, "dimids: ", dimids, " varid: ", varid
     endif
     
-    ncstatus = nfmpi_put_vara_real_all(ncid, i, starts, counts, u(1:local_nx,1:local_ny))
+    ncstatus = nfmpi_put_vara_real_all(ncid, i, starts, counts, h(1:local_nx,1:local_ny))
     call ncdf_check(ncstatus, "nfmpi_put_vara_real_all for write", comm_rank)
     
     ! close netcdf file
@@ -199,20 +201,63 @@ program swe_mpi
         end subroutine ncdf_check
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        ! Function: derivative
+        ! Function: du
         ! Description:
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
-         subroutine derivative(nx, ny, dx, dy, f, df)
+         function derivative(h, u, v, dx, dy, df)
+           
+            implicit none 
+            
+             real, dimension(:,:), intent(inout) :: u, v, h 
+             real, intent(in) :: dx, dy
+             integer :: nx, ny  ! field dims
+             ! return type
+             real, dimension(0:size(h,dim=1)-1,0:size(h,dim=2)-1) :: derivative
+            
+             interface
+             function df(h,u,v,dx,dy)
+                real, dimension(:,:), intent(in) :: h, u, v
+                real, intent(in) :: dx, dy
+                real, dimension(0:size(h,dim=1)-1,0:size(h,dim=2)-1) :: df
+             end function df
+             end interface
+
+             nx = size(h,dim=1)-2 ! length of size is nx + 2 halo cells
+             ny = size(h,dim=2)-2
+
+             call update_halos(u, nx, ny)
+             call update_halos(v, nx, ny)
+             call update_halos(h, nx, ny)
+             derivative = df(h,u,v,dx,dy)
+
+         end function derivative
+
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! Function: update_halos 
+        ! Description:
+        ! Do "halo exchange" here to ensure that
+        ! x(0,:) and x(nx+1,:) are updated from neighboring processors
+        !
+        ! 1) Every MPI task needs to know its location in the overall decomposition (PX, PY)
+        ! 2) For the halo exchange, updated left column from processor PX-1
+        !                           updated right column from processor PX+1
+        !
+        ! call MPI_Irecv(..., x(0,:), ...)     ! recv from task to left
+        ! call MPI_Irecv(..., x(nx+1,:), ...)  ! recv from task to right
+        !
+        ! call MPI_Isend(..., x(nx,:), ...)    ! send to task to right
+        ! call MPI_Isend(..., x(1,:), ...)     ! send to task to left
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+         subroutine update_halos(f, nx, ny)
            
             implicit none 
             
              type(Neighbors) :: cell_neighbors
              integer, intent(in) :: nx, ny          ! field dims
-             integer :: PX, PY, pleft, pright, pabove, pbelow
-             real, intent(in) :: dx, dy
              real, dimension(0:nx+1,0:ny+1), intent(inout) :: f
-             real, dimension(0:nx+1,0:ny+1), intent(out) :: df
+             integer :: PX, PY, pleft, pright, pabove, pbelow
              integer  :: stat(8*MPI_STATUS_SIZE)
              integer :: i, j, tag, ierr
              integer :: rreq(8)
@@ -234,21 +279,6 @@ program swe_mpi
             pleft = cell_neighbors%left
             pbelow = cell_neighbors%below
             pabove = cell_neighbors%above
-            !print *, comm_rank, "right: ", cell_neighbors%right, "pleft: ", cell_neighbors%left, &
-            !                     "pbelow: ", cell_neighbors%below, "pabove: ", cell_neighbors%above
-
-            ! Do "halo exchange" here to ensure that
-            ! x(0,:) and x(nx+1,:) are updated from neighboring processors
-            !
-            ! 1) Every MPI task needs to know its location in the overall decomposition (PX, PY)
-            ! 2) For the halo exchange, updated left column from processor PX-1
-            !                           updated right column from processor PX+1
-
-            ! call MPI_Irecv(..., x(0,:), ...)     ! recv from task to left
-            ! call MPI_Irecv(..., x(nx+1,:), ...)  ! recv from task to right
- 
-            ! call MPI_Isend(..., x(nx,:), ...)    ! send to task to right
-            ! call MPI_Isend(..., x(1,:), ...)     ! send to task to left
 
             ! halo update from left cell
             call MPI_Irecv(data_buf_left, ny, MPI_REAL, pleft, 0, &
@@ -294,10 +324,7 @@ program swe_mpi
             f(1:nx,0) = data_buf_lower
             f(1:nx,ny+1) = data_buf_upper
 
-            !df = diff_center_x(f,dx)
-            df = diff_center_y(f,dy)
-
-        end subroutine derivative
-   
+         end subroutine update_halos
+  
 end program
 
