@@ -17,6 +17,7 @@ add_executable(swe_mpi
 		   equations_par.f90
 		   sources.f90
 	       swe_mpi_help.f90
+		   observer_par.f90
 	       halos.f90)
 message( STATUS "MPI_FOUND: ${MPI_FOUND}, MPI_FORTRAN_FOUND: ${MPI_FORTRAN_FOUND}")
 message( STATUS "MPI_INCLUDE_DIRS: ${MPI_Fortran_INCLUDE_DIRS}")

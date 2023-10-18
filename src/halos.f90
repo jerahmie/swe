@@ -4,6 +4,7 @@ program swe_mpi
     use init_par
     use swe_mpi_help
     use equations_par
+    use observer_par
 
     implicit none
 
@@ -102,25 +103,25 @@ program swe_mpi
     ! write results
     ! TODO: move to output module 
     ! create new netcdf file for read
-    ncstatus = nf90mpi_create(mpi_comm=MPI_COMM_WORLD, path=trim(ncfile_output), &
-                              cmode=NF_CLOBBER, mpi_info=MPI_INFO_NULL, ncid=ncid)
-    call ncdf_check(ncstatus, "nf90mpi_open for write", comm_rank)
-    ncstatus = nfmpi_def_dim(ncid, "ny", int(ny, kind=MPI_OFFSET_KIND), nyid)
-    call ncdf_check(ncstatus, "nf90mpi_def_dim for write", comm_rank)
-    ncstatus = nfmpi_def_dim(ncid, "nx", int(nx, kind=MPI_OFFSET_KIND), nxid)
-    call ncdf_check(ncstatus, "nf90mpi_def_dim for write", comm_rank)
-    ncstatus = nfmpi_def_dim(ncid, "time", nf90mpi_unlimited, timedimid)
-    call ncdf_check(ncstatus, "nf90mpi_def_dim for write", comm_rank)
-    
-    ncstatus = nfmpi_def_var(ncid, "var", NF90_FLOAT, 2, (/nxid, nyid, timedimid/), varid)
-    call ncdf_check(ncstatus, "nf90mpi_def_var for write", comm_rank)
-
-    ncstatus = nf90mpi_enddef(ncid)
-    call ncdf_check(ncstatus, "nf90mpi_enddef for write", comm_rank)
-    if (comm_rank .eq. 0) then
-        print*, "dimids: ", nxid, nyid, " varid: ", varid
-    endif
-    
+!    ncstatus = nf90mpi_create(mpi_comm=MPI_COMM_WORLD, path=trim(ncfile_output), &
+!                              cmode=NF_CLOBBER, mpi_info=MPI_INFO_NULL, ncid=ncid)
+!    call ncdf_check(ncstatus, "nf90mpi_open for write", comm_rank)
+!    ncstatus = nfmpi_def_dim(ncid, "ny", int(ny, kind=MPI_OFFSET_KIND), nyid)
+!    call ncdf_check(ncstatus, "nf90mpi_def_dim for write", comm_rank)
+!    ncstatus = nfmpi_def_dim(ncid, "nx", int(nx, kind=MPI_OFFSET_KIND), nxid)
+!    call ncdf_check(ncstatus, "nf90mpi_def_dim for write", comm_rank)
+!    ncstatus = nfmpi_def_dim(ncid, "time", nf90mpi_unlimited, timedimid)
+!    call ncdf_check(ncstatus, "nf90mpi_def_dim for write", comm_rank)
+!    
+!    ncstatus = nfmpi_def_var(ncid, "var", NF90_FLOAT, 2, (/nxid, nyid, timedimid/), varid)
+!    call ncdf_check(ncstatus, "nf90mpi_def_var for write", comm_rank)
+!
+!    ncstatus = nf90mpi_enddef(ncid)
+!    call ncdf_check(ncstatus, "nf90mpi_enddef for write", comm_rank)
+!    if (comm_rank .eq. 0) then
+!        print*, "dimids: ", nxid, nyid, " varid: ", varid
+!    endif
+    observer_par_init(ncfile_output, )
     ! execute solver
     do it=1,NT
         u = u + dt*derivative(h, u, v, dx, dy, du)
