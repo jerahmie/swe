@@ -11,20 +11,25 @@ program swe_mpi
     type(Neighbors) :: cell_neighbors
     integer :: num_args
     integer :: comm_rank, comm_size, ncid, ncstatus
-    integer :: i, j, it,  ndims, dimids(2), varid, nxid, nyid, timedimid
+    integer :: i, j, it, ndims, dimids(2), varid, nxid, nyid, timedimidk
     integer :: local_nx, local_ny, nsubgrid
     character(255) :: ncfile_input, ncfile_output
     character(len=32), dimension(:), allocatable :: dimnamei ! varname
     integer(kind=MPI_OFFSET_KIND),dimension(:), allocatable :: dimval
     logical :: res
     real(kind=4), allocatable, dimension(:,:) :: h, u, v
+    real(kind=4) :: dx, dy, dt
+    integer(kind=MPI_OFFSET_KIND) :: NT
     integer(kind=MPI_OFFSET_KIND) :: starts(2), counts(2)
+    integer(kind=MPI_OFFSET_KIND) :: starts_out(3), counts_out(3)
  
     ! Simulation variables
     NX = 200
     NY = 200
-    NT = 1
-    !dt = 0.1
+    NT = 100
+    dt = 0.2 
+    dx = 0.4 
+    dy = 0.4 
 
     ! get filename from command line
     num_args = command_argument_count()
@@ -55,7 +60,6 @@ program swe_mpi
 
     ! find nearest neighbors
     cell_neighbors = nearest_neighbors(comm_rank, comm_size) 
-! TODO: move load data calls to module
     ! open netcdf file for read
     ncstatus = nf90mpi_open(mpi_comm=MPI_COMM_WORLD, path=ncfile_input, &
                             omode=NF_NOWRITE, mpi_info=MPI_INFO_NULL, ncid=ncid)
@@ -63,13 +67,13 @@ program swe_mpi
 
     ! get number, names, and values of dimensions
     ncstatus = nfmpi_inq_ndims(ncid, ndims)  ! number of dimensions
-    call ncdf_check(ncstatus, "nfmpi_inq_ndims")
+    call ncdf_check(ncstatus, "nfmpi_inq_ndims", comm_rank)
     allocate(dimval(ndims))
     allocate(dimnamei(ndims))
     
     do i=1,ndims
         ncstatus = nfmpi_inq_dim(ncid, i, dimnamei(i), dimval(i))
-        call ncdf_check(ncstatus, "nfmpi_inq_dim")
+        call ncdf_check(ncstatus, "nfmpi_inq_dim", comm_rank)
         if (dimnamei(i) .eq. "nx") then
             nx = dimval(i)
         else if (dimnamei(i) .eq. "ny") then
@@ -93,47 +97,32 @@ program swe_mpi
 
     i=1 ! h is only variable in source netcdf
     ncstatus = nfmpi_get_vara_real_all(ncid, i , starts, counts, h(1:local_nx,1:local_ny))
-    call ncdf_check(ncstatus, "nfmpi_get_vara_real_all", comm_rank)
+    call ncdf_check(ncstatus, "nfmpi_get_vara_double_all", comm_rank)
    
     ! close netcdf file
     ncstatus = nf90mpi_close(ncid)
     call ncdf_check(ncstatus, "nf90mpi_close", comm_rank)
 
+    ! execute solver and write result to netcdf file
+    call observer_par_init(ncfile_output, nx, ny)
 
-    ! write results
-    ! TODO: move to output module 
-    ! create new netcdf file for read
-!    ncstatus = nf90mpi_create(mpi_comm=MPI_COMM_WORLD, path=trim(ncfile_output), &
-!                              cmode=NF_CLOBBER, mpi_info=MPI_INFO_NULL, ncid=ncid)
-!    call ncdf_check(ncstatus, "nf90mpi_open for write", comm_rank)
-!    ncstatus = nfmpi_def_dim(ncid, "ny", int(ny, kind=MPI_OFFSET_KIND), nyid)
-!    call ncdf_check(ncstatus, "nf90mpi_def_dim for write", comm_rank)
-!    ncstatus = nfmpi_def_dim(ncid, "nx", int(nx, kind=MPI_OFFSET_KIND), nxid)
-!    call ncdf_check(ncstatus, "nf90mpi_def_dim for write", comm_rank)
-!    ncstatus = nfmpi_def_dim(ncid, "time", nf90mpi_unlimited, timedimid)
-!    call ncdf_check(ncstatus, "nf90mpi_def_dim for write", comm_rank)
-!    
-!    ncstatus = nfmpi_def_var(ncid, "var", NF90_FLOAT, 2, (/nxid, nyid, timedimid/), varid)
-!    call ncdf_check(ncstatus, "nf90mpi_def_var for write", comm_rank)
-!
-!    ncstatus = nf90mpi_enddef(ncid)
-!    call ncdf_check(ncstatus, "nf90mpi_enddef for write", comm_rank)
-!    if (comm_rank .eq. 0) then
-!        print*, "dimids: ", nxid, nyid, " varid: ", varid
-!    endif
-    observer_par_init(ncfile_output, )
-    ! execute solver
+    starts_out(1) = starts(1)
+    starts_out(2) = starts(2)
+    counts_out(1) = counts(1)
+    counts_out(2) = counts(2)
+    counts_out(3) = 1
     do it=1,NT
         u = u + dt*derivative(h, u, v, dx, dy, du)
         v = v + dt*derivative(h, u, v, dx, dy, dv)
         h = h + dt*derivative(h, u, v, dx, dy, dh)
-        ncstatus = nfmpi_put_vara_real_all(ncid, i, starts, counts, h(1:local_nx,1:local_ny))
+        !ncstatus = nfmpi_put_vara_double_all(ncid, i, starts_out, counts_out, h(1:local_nx,1:local_ny))
+        starts_out(3) = it 
+        ncstatus = nfmpi_put_vara_real_all(ncid, i, starts_out, counts_out, h(1:local_nx, 1:local_ny))
         call ncdf_check(ncstatus, "nfmpi_put_vara_real_all for write", comm_rank)
     end do
     
     ! close netcdf file
-    ncstatus = nf90mpi_close(ncid)
-    call ncdf_check(ncstatus, "nf90mpi_close for write", comm_rank)
+    call observer_par_finalize()
 
     if (comm_rank .eq. 0) then
         print *, "Program finished with ", comm_size, " threads."
@@ -184,24 +173,24 @@ program swe_mpi
         !        comm_rank (optional) - mpi processor rank 
         !         
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        subroutine ncdf_check(ncstatus, message, comm_rank)
-       
-            implicit none
-            integer :: ncstatus
-            integer, optional :: comm_rank
-            character(*) :: message
-            
-            if (ncstatus .ne. 0) then
-                if (present(comm_rank)) then
-                    write (6, *) "PnetCDF procedure reported error: (" , &
-                        ncstatus, "), comm_rank ", comm_rank, ": ", trim(message)   
-                else
-                    write (6, *) "PnetCDF procedure reported error: (", &
-                        ncstatus, "): ", trim(message)
-                end if
-            end if
-        
-        end subroutine ncdf_check
+!        subroutine ncdf_check(ncstatus, message, comm_rank)
+!       
+!            implicit none
+!            integer :: ncstatus
+!            integer, optional :: comm_rank
+!            character(*) :: message
+!            
+!            if (ncstatus .ne. 0) then
+!                if (present(comm_rank)) then
+!                    write (6, *) "PnetCDF procedure reported error: (" , &
+!                        ncstatus, "), comm_rank ", comm_rank, ": ", trim(message)   
+!                else
+!                    write (6, *) "PnetCDF procedure reported error: (", &
+!                        ncstatus, "): ", trim(message)
+!                end if
+!            end if
+!        
+!        end subroutine ncdf_check
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         ! Function: du
@@ -212,17 +201,17 @@ program swe_mpi
            
             implicit none 
             
-             real, dimension(:,:), intent(inout) :: u, v, h 
-             real, intent(in) :: dx, dy
+             real(kind=4), dimension(:,:), intent(inout) :: u, v, h 
+             real(kind=4), intent(in) :: dx, dy
              integer :: nx, ny  ! field dims
              ! return type
-             real, dimension(0:size(h,dim=1)-1,0:size(h,dim=2)-1) :: derivative
+             real(kind=4), dimension(0:size(h,dim=1)-1,0:size(h,dim=2)-1) :: derivative
             
              interface
              function df(h,u,v,dx,dy)
-                real, dimension(:,:), intent(in) :: h, u, v
-                real, intent(in) :: dx, dy
-                real, dimension(0:size(h,dim=1)-1,0:size(h,dim=2)-1) :: df
+                real(kind=4), dimension(:,:), intent(in) :: h, u, v
+                real(kind=4), intent(in) :: dx, dy
+                real(kind=4), dimension(0:size(h,dim=1)-1,0:size(h,dim=2)-1) :: df
              end function df
              end interface
 
@@ -259,13 +248,13 @@ program swe_mpi
             
              type(Neighbors) :: cell_neighbors
              integer, intent(in) :: nx, ny          ! field dims
-             real, dimension(0:nx+1,0:ny+1), intent(inout) :: f
+             real(kind=4), dimension(0:nx+1,0:ny+1), intent(inout) :: f
              integer :: PX, PY, pleft, pright, pabove, pbelow
              integer  :: stat(8*MPI_STATUS_SIZE)
              integer :: i, j, tag, ierr
              integer :: rreq(8)
-             real, dimension(nx) :: data_buf_left, data_buf_right
-             real, dimension(ny) :: data_buf_upper, data_buf_lower
+             real(kind=4), dimension(nx) :: data_buf_left, data_buf_right
+             real(kind=4), dimension(ny) :: data_buf_upper, data_buf_lower
 
              ! In setup routine
              ! *) NPX - num tasks in x-direction (initially, sqrt(comm_size))

@@ -10,12 +10,12 @@ module equations_par
 
   private
 
-    real, parameter :: g = -9.8 ! acceleration due to gravity (m/s)
+    real(kind=4), parameter :: g = -9.8 ! acceleration due to gravity (m/s)
 
   public :: diff_center_x, diff_center_y, euler_forward, du, dv, dh, set_initial_state
 
-  real, public :: dx = 2.0, dy = 2.0, dt = 0.2  ! grid resolution
-  integer, public :: NX, NY, NT  ! grid dimensions
+  !real(kind=4), public :: dx = 2.0, dy = 2.0, dt = 0.2  ! grid resolution
+  integer, public :: NX, NY  ! grid dimensions
 
   contains
 
@@ -34,11 +34,11 @@ module equations_par
     
     implicit none
 
-    real, dimension(:,:), intent(in) :: h, u, v 
-    real, intent(in) :: dx, dy
+    real(kind=4), dimension(:,:), intent(in) :: h, u, v 
+    real(kind=4), intent(in) :: dx, dy
 
     ! return value du
-    real, dimension(size(u,dim=1), size(u,dim=2)) :: du
+    real(kind=4), dimension(size(u,dim=1), size(u,dim=2)) :: du
 
     du = g*diff_center_x(h,dx) - & 
          u*diff_center_x(u,dx) - &
@@ -61,11 +61,11 @@ module equations_par
 
     implicit none 
     
-    real, dimension(:,:), intent(in) :: h, u, v
-    real, intent(in) :: dx, dy
+    real(kind=4), dimension(:,:), intent(in) :: h, u, v
+    real(kind=4), intent(in) :: dx, dy
 
     ! return value
-    real, dimension(size(v,dim=1),size(v,dim=2)) :: dv
+    real(kind=4), dimension(size(v,dim=1),size(v,dim=2)) :: dv
     dv = g*diff_center_y(h,dy) - &
          u*diff_center_x(v,dx) - &
          v*diff_center_y(v,dy)
@@ -86,11 +86,11 @@ module equations_par
   pure function dh(h, u, v, dx, dy)
 
     implicit none
-    real, dimension(:,:), intent(in) :: h, u, v
-    real, intent(in) :: dx, dy
+    real(kind=4), dimension(:,:), intent(in) :: h, u, v
+    real(kind=4), intent(in) :: dx, dy
     
     ! return value
-    real, dimension(size(h,dim=1),size(h,dim=2)) :: dh 
+    real(kind=4), dimension(size(h,dim=1),size(h,dim=2)) :: dh 
     dh = -1.0*(diff_center_x(u*h,dx) + diff_center_y(v*h,dy))
 
   end function dh
@@ -106,10 +106,10 @@ module equations_par
 
     implicit none
   
-    real, dimension(0:,0:), intent(in) :: r
-    real, intent(in) :: dx
+    real(kind=4), dimension(0:,0:), intent(in) :: r
+    real(kind=4), intent(in) :: dx
     integer :: i, j, nxdim, nydim
-    real, dimension(0:size(r,dim=1)-1,0:size(r,dim=2)-1) :: diff_center_x
+    real(kind=4), dimension(0:size(r,dim=1)-1,0:size(r,dim=2)-1) :: diff_center_x
 
     ! return value
     nxdim = size(r,dim=1)-2
@@ -135,12 +135,12 @@ module equations_par
 
     implicit none
   
-    real, dimension(0:,0:), intent(in) :: r
-    real, intent(in) :: dy
+    real(kind=4), dimension(0:,0:), intent(in) :: r
+    real(kind=4), intent(in) :: dy
     integer :: i, j, nxdim, nydim
 
     ! return value
-    real, dimension(0:size(r,dim=1)-1,0:size(r,dim=2)-1) :: diff_center_y
+    real(kind=4), dimension(0:size(r,dim=1)-1,0:size(r,dim=2)-1) :: diff_center_y
   
     ! return value
     nxdim = size(r,dim=1)-2
@@ -167,25 +167,25 @@ module equations_par
   ! Returns: i
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
   !function euler_forward(h, u, v, dx, dy, dt, dh)
-  pure function euler_forward(h, u, v, dx, dy, dt, df)
-     
-    implicit none
- 
-    real, dimension(:,:), intent(in) :: h, u, v
-    real, intent(in) :: dx, dy, dt
-    ! return value
-    real, dimension(size(h,dim=1),size(h,dim=2)) :: euler_forward
-
-    interface 
-     pure function df(h,u,v,dx,dy)
-        real, dimension(:,:), intent(in) :: h, u, v
-        real, intent(in) :: dx, dy
-        real, dimension(size(h,dim=1),size(h,dim=2)) :: df
-     end function df
-    end interface
-    euler_forward = dt*df(h,u,v,dx,dy)
-  
-  end function euler_forward
+!  pure function euler_forward(h, u, v, dx, dy, dt, df)
+!     
+!    implicit none
+! 
+!    real, dimension(:,:), intent(in) :: h, u, v
+!    real, intent(in) :: dx, dy, dt
+!    ! return value
+!    real, dimension(size(h,dim=1),size(h,dim=2)) :: euler_forward
+!
+!    interface 
+!     pure function df(h,u,v,dx,dy)
+!        real, dimension(:,:), intent(in) :: h, u, v
+!        real, intent(in) :: dx, dy
+!        real, dimension(size(h,dim=1),size(h,dim=2)) :: df
+!     end function df
+!    end interface
+!    euler_forward = dt*df(h,u,v,dx,dy)
+!  
+!  end function euler_forward
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
   ! Name: set_initial_state
@@ -193,16 +193,16 @@ module equations_par
   !
   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
-  subroutine set_initial_state(h, u, v)
-    use sources, only: gaussian2d 
-    implicit none
-
-    real, dimension(:,:) :: h, u, v
-  
-    h = 1.0 + 0.1 * gaussian2d(10.0, 0.5*real(NX)*dx, 0.5*real(NY)*dy, dx, dy, NX, NY)  
-    u = 0.0    
-    v = 0.0 
-  end subroutine set_initial_state
+!  subroutine set_initial_state(h, u, v)
+!    use sources, only: gaussian2d 
+!    implicit none
+!
+!    real(kind=4), dimension(:,:) :: h, u, v
+!  
+!    h = 1.0 + 0.1 * gaussian2d(10.0, 0.5*real(NX)*dx, 0.5*real(NY)*dy, dx, dy, NX, NY)  
+!    u = 0.0    
+!    v = 0.0 
+!  end subroutine set_initial_state
 
 end module equations_par 
 
